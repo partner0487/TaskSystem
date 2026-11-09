@@ -9,7 +9,9 @@ import 'package:timezone/timezone.dart' as tz;
 import 'models.dart';
 import 'storage.dart';
 
-const _channelId = 'quests';
+// 通知類別建立後，App 就不能再改它的設定（例如圖示紅點），要改只能換新的 id。
+// 舊的 id 列在 _oldChannelIds，啟動時刪除。
+const _channelId = 'quest_list';
 const _channelName = '待辦任務';
 const _actionComplete = 'complete';
 const _uiPortName = 'quest_ui_port';
@@ -20,7 +22,10 @@ const _resetIdOffset = 1000000;
 
 /// 到期前的震動提醒，id = 細項 id + 這個偏移量。
 const _reminderIdOffset = 2000000;
-const _reminderChannelId = 'reminders';
+const _reminderChannelId = 'deadline_reminders';
+
+/// 已停用的舊通知類別（當時會在 App 圖示上顯示紅點）。
+const _oldChannelIds = ['quests', 'reminders'];
 
 /// 通知欄的事件（按「完成」、把通知滑掉）由 Android 另外開一個背景 isolate 執行，
 /// 就算 App 完全沒開也一樣。@pragma 讓編譯器不會把它當成沒用到的程式碼刪掉。
@@ -99,6 +104,11 @@ class Notifier {
   /// 2. 其它通知、預約全部移除
   /// 3. 已完成的每日 / 每週任務，預約在下次重置時重新出現（App 沒開也會出現）
   static Future<void> sync(AppData data) async {
+    // 刪掉舊的通知類別（不存在時什麼都不會發生）。同一個 id 的通知會在下面用新類別重發。
+    for (final id in _oldChannelIds) {
+      await _android?.deleteNotificationChannel(channelId: id);
+    }
+
     final now = DateTime.now();
     final keepActive = <int>{};
     final keepPending = <int>{};
@@ -188,6 +198,7 @@ class Notifier {
           _reminderChannelId,
           '到期提醒',
           channelDescription: '截止前震動提醒（不響鈴）',
+          channelShowBadge: false, // App 圖示不顯示紅點
           icon: 'ic_stat_quest',
           importance: Importance.high, // 從畫面上方滑出
           priority: Priority.high,
@@ -228,6 +239,7 @@ class Notifier {
         _channelId,
         _channelName,
         channelDescription: '尚未完成的任務會常駐在通知欄',
+        channelShowBadge: false, // App 圖示不顯示紅點
         icon: 'ic_stat_quest', // 背景 isolate 也能正確顯示圖示
         importance: Importance.low, // 不響鈴、不跳出，安靜地待在通知欄
         priority: Priority.low,
