@@ -177,12 +177,14 @@ class _StepFormState extends State<_StepForm> {
   void _submit() {
     final title = _title.text.trim();
     if (title.isEmpty) return;
+    final recurring = widget.type.recurring;
     Navigator.pop<StepInput>(context, (
       title: title,
       note: _note.text.trim(),
-      deadline: _deadline,
+      // 每日 / 每週不使用手動期限，存檔時清掉，避免日後改分類時冒出舊期限
+      deadline: recurring ? null : _deadline,
       weekdays: _weekdays.toList()..sort(),
-      remindBefore: _remind,
+      remindBefore: recurring ? null : _remind,
     ));
   }
 
@@ -206,10 +208,17 @@ class _StepFormState extends State<_StepForm> {
           maxLines: 5,
           decoration: const InputDecoration(labelText: '備註（可留空）'),
         ),
+        if (widget.type == QuestType.daily)
+          const Padding(
+            padding: EdgeInsets.only(top: 16),
+            child: Text('每天凌晨 04:00 重新出現', style: TextStyle(color: GColors.sub)),
+          ),
         if (widget.type == QuestType.weekly) ...[
           const SizedBox(height: 16),
           Text(
-            _weekdays.isEmpty ? '重置日：沒選就是每週一' : '重置日：${weekdaysText(QuestStep(id: 0, title: '', weekdays: _weekdays.toList()))}',
+            _weekdays.isEmpty
+                ? '沒選星期幾：整週都在，週日 24:00 截止，週一 04:00 重新出現'
+                : '${weekdaysText(QuestStep(id: 0, title: '', weekdays: _weekdays.toList()))}出現，當天 24:00 截止',
             style: const TextStyle(color: GColors.sub),
           ),
           const SizedBox(height: 6),
@@ -227,21 +236,26 @@ class _StepFormState extends State<_StepForm> {
             ],
           ),
         ],
-        const SizedBox(height: 8),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('設定期限'),
-          subtitle: Text(_deadline == null ? '無期限' : formatDateTime(_deadline!)),
-          value: _deadline != null,
-          onChanged: (on) {
-            if (on) {
-              _pickDeadline();
-            } else {
-              setState(() => _deadline = null);
-            }
-          },
-        ),
-        if (_deadline != null) ...[
+        // 期限與提醒只給主線 / 支線；每日 / 每週有自動的時間規則
+        if (!widget.type.recurring) ...[
+          const SizedBox(height: 8),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('設定期限'),
+            subtitle: Text(_deadline == null
+                ? '無期限'
+                : '${formatDateTime(_deadline!)}（逾期 ${overdueHideAfter.inDays} 天後移出通知欄）'),
+            value: _deadline != null,
+            onChanged: (on) {
+              if (on) {
+                _pickDeadline();
+              } else {
+                setState(() => _deadline = null);
+              }
+            },
+          ),
+        ],
+        if (!widget.type.recurring && _deadline != null) ...[
           TextButton.icon(
             onPressed: _pickDeadline,
             icon: const Icon(Icons.edit_calendar),

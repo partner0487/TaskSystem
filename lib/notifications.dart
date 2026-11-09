@@ -107,8 +107,8 @@ class Notifier {
 
     for (final q in data.quests) {
       for (final s in q.steps) {
-        // 到期提醒：只要還沒完成就照常提醒
-        if (!s.done) {
+        // 到期提醒（只有主線 / 支線有手動期限）：只要還沒完成就照常提醒
+        if (!s.done && !q.type.recurring) {
           keepActive.add(_reminderIdOffset + s.id); // 已經跳出的提醒留著，等使用者自己處理
           final at = s.remindAt;
           if (at != null && at.isAfter(now)) {
@@ -116,6 +116,9 @@ class Notifier {
             reminders.add((q, s, at));
           }
         }
+
+        // 逾期超過 7 天的主線 / 支線不再放通知欄（App 裡還看得到）
+        if (isStale(q.type, s, now)) continue;
 
         if (!s.done && isActiveOn(q.type, s, now)) {
           keepActive.add(s.id);
@@ -215,6 +218,11 @@ class Notifier {
     final d = effectiveDeadline(q.type, s, now); // 每週任務會自動有期限
     final countdown = d != null && d.isAfter(now) && d.difference(now) <= const Duration(hours: 24);
 
+    // 到時間由系統自動移除通知（App 沒開也會準時消失）：
+    // 每週任務 → 晚上 12 點；主線 / 支線 → 逾期滿 7 天
+    final removeAt = q.type == QuestType.weekly ? d : notificationHideAt(q.type, s);
+    final timeout = removeAt != null && removeAt.isAfter(now) ? removeAt.difference(now) : null;
+
     return NotificationDetails(
       android: AndroidNotificationDetails(
         _channelId,
@@ -234,6 +242,7 @@ class Notifier {
         when: countdown ? d.millisecondsSinceEpoch : null,
         usesChronometer: countdown,
         chronometerCountDown: countdown,
+        timeoutAfter: timeout?.inMilliseconds,
         subText: '${q.type.label}・${q.title}',
         color: const Color(0xFFD3BC8E),
         category: AndroidNotificationCategory.reminder,

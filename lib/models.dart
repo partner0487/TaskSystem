@@ -233,10 +233,31 @@ DateTime nextResetTime(DateTime now) {
   return now.isBefore(today4) ? today4 : DateTime(now.year, now.month, now.day + 1, 4);
 }
 
-/// 今天（以凌晨 4 點為分界）這個細項該不該出現。
-/// 有勾星期幾的每週任務只在那幾天出現；其它都是每天出現（直到完成）。
-bool isActiveOn(QuestType type, QuestStep s, DateTime now) =>
-    type != QuestType.weekly || s.weekdays.isEmpty || s.weekdays.contains(gameDay(now).weekday);
+/// 現在這個細項該不該出現（不管完成與否）。
+/// - 每週任務：只在選的星期幾出現；過了自動期限（晚上 12 點）就結束，等下次再出現
+/// - 其它：一直都在（直到完成）
+bool isActiveOn(QuestType type, QuestStep s, DateTime now) {
+  if (type != QuestType.weekly) return true;
+  if (s.weekdays.isNotEmpty && !s.weekdays.contains(gameDay(now).weekday)) return false;
+  final d = effectiveDeadline(type, s, now);
+  return d == null || now.isBefore(d);
+}
+
+/// 主線 / 支線逾期多久後從通知欄移除（App 裡仍保留）。
+const overdueHideAfter = Duration(days: 7);
+
+/// 主線 / 支線從通知欄移除的時間；沒有期限或每日 / 每週任務回傳 null。
+DateTime? notificationHideAt(QuestType type, QuestStep s) {
+  final d = s.deadline;
+  if (type.recurring || d == null) return null;
+  return d.add(overdueHideAfter);
+}
+
+/// 已逾期太久，不再顯示在通知欄。
+bool isStale(QuestType type, QuestStep s, DateTime now) {
+  final t = notificationHideAt(type, s);
+  return t != null && !now.isBefore(t);
+}
 
 /// 這個細項下一次被重置（重新出現）的時間；主線 / 支線不會重置，回傳 null。
 DateTime? nextResetFor(QuestType type, QuestStep s, DateTime now) {
@@ -295,12 +316,13 @@ String notificationDeadlineText(QuestStep s, QuestType type, DateTime now) {
 }
 
 /// 實際用來倒數的截止時間：
-/// - 有自己設定期限 → 用設定的
-/// - 每週任務、有選星期幾 → 當天晚上 12 點
-/// - 每週任務、沒選星期幾 → 這週日晚上 12 點
-/// - 其它 → 沒有期限
+/// - 主線 / 支線 → 自己設定的期限（可以沒有）
+/// - 每日 → 沒有期限（每天 04:00 重置）
+/// - 每週、有選星期幾 → 當天晚上 12 點
+/// - 每週、沒選星期幾 → 這週日晚上 12 點
+/// 每日 / 每週有自動規則，會忽略手動設定的期限。
 DateTime? effectiveDeadline(QuestType type, QuestStep s, DateTime now) {
-  if (s.deadline != null) return s.deadline;
+  if (!type.recurring) return s.deadline;
   if (type != QuestType.weekly) return null;
   final day = gameDay(now);
   if (s.weekdays.isNotEmpty) {

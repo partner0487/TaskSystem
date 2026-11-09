@@ -70,12 +70,21 @@ void main() {
     final s = QuestStep(id: 1, title: '籃球', weekdays: const [DateTime.saturday, DateTime.sunday]);
     expect(isActiveOn(QuestType.weekly, s, DateTime(2026, 11, 9, 23)), isFalse); // 週一
     expect(isActiveOn(QuestType.weekly, s, DateTime(2026, 11, 14, 9)), isTrue); // 週六
-    expect(isActiveOn(QuestType.weekly, s, DateTime(2026, 11, 16, 3)), isTrue); // 週一凌晨 3 點還算週日
+    expect(isActiveOn(QuestType.weekly, s, DateTime(2026, 11, 15, 23, 59)), isTrue); // 週日晚上
+    // 過了週日晚上 12 點：本次已結束（不是「已逾期」），直接消失
+    expect(isActiveOn(QuestType.weekly, s, DateTime(2026, 11, 16, 0, 0)), isFalse);
+    expect(isActiveOn(QuestType.weekly, s, DateTime(2026, 11, 16, 3)), isFalse);
     expect(isActiveOn(QuestType.weekly, s, DateTime(2026, 11, 16, 4)), isFalse); // 週一 4 點過後
+    // 週六晚上 12 點後結束，週日凌晨 4 點再出現
+    expect(isActiveOn(QuestType.weekly, s, DateTime(2026, 11, 15, 1)), isFalse);
+    expect(nextResetFor(QuestType.weekly, s, DateTime(2026, 11, 15, 1)), DateTime(2026, 11, 15, 4));
+    expect(isActiveOn(QuestType.weekly, s, DateTime(2026, 11, 15, 4)), isTrue);
     // 週一新增的籃球，下次在週六凌晨 4 點出現
     expect(nextResetFor(QuestType.weekly, s, DateTime(2026, 11, 9, 23)), DateTime(2026, 11, 14, 4));
     // 沒勾星期幾的每週任務、其它分類：每天都出現
-    expect(isActiveOn(QuestType.weekly, QuestStep(id: 2, title: 'x'), DateTime(2026, 11, 9)), isTrue);
+    expect(isActiveOn(QuestType.weekly, QuestStep(id: 2, title: 'x'), DateTime(2026, 11, 9, 12)), isTrue);
+    // 沒選星期幾：週日 24:00 截止 → 週一 00:00～04:00 本次已結束
+    expect(isActiveOn(QuestType.weekly, QuestStep(id: 2, title: 'x'), DateTime(2026, 11, 9, 1)), isFalse);
     expect(isActiveOn(QuestType.daily, s, DateTime(2026, 11, 9)), isTrue);
   });
 
@@ -92,10 +101,21 @@ void main() {
     expect(effectiveDeadline(QuestType.weekly, anyDay, mon), DateTime(2026, 11, 16));
     expect(deadlineText(anyDay, QuestType.weekly, mon), '剩 6 天 12 小時');
 
-    // 自己設的期限優先；主線沒設期限就沒有
+    // 主線用自己設的期限；每週 / 每日忽略手動期限，用自動規則
     final custom = QuestStep(id: 3, title: 'x', deadline: DateTime(2026, 11, 10, 9));
-    expect(effectiveDeadline(QuestType.weekly, custom, mon), DateTime(2026, 11, 10, 9));
+    expect(effectiveDeadline(QuestType.main, custom, mon), DateTime(2026, 11, 10, 9));
+    expect(effectiveDeadline(QuestType.weekly, custom, mon), DateTime(2026, 11, 16));
+    expect(effectiveDeadline(QuestType.daily, custom, mon), isNull);
     expect(effectiveDeadline(QuestType.main, anyDay, mon), isNull);
+  });
+
+  test('主線 / 支線逾期 7 天後移出通知欄，每週 / 每日不會', () {
+    final s = QuestStep(id: 1, title: '交報告', deadline: DateTime(2026, 11, 1, 18));
+    expect(notificationHideAt(QuestType.side, s), DateTime(2026, 11, 8, 18));
+    expect(isStale(QuestType.side, s, DateTime(2026, 11, 8, 17, 59)), isFalse);
+    expect(isStale(QuestType.side, s, DateTime(2026, 11, 8, 18)), isTrue);
+    expect(isStale(QuestType.weekly, s, DateTime(2026, 12, 1)), isFalse);
+    expect(isStale(QuestType.main, QuestStep(id: 2, title: '無期限'), DateTime(2030)), isFalse);
   });
 
   test('倒數文字的三種格式', () {

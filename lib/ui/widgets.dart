@@ -136,19 +136,27 @@ class StepCard extends StatelessWidget {
   /// 今天不是它的日子（例如週一的「週六日籃球」）
   bool get _resting => !isActiveOn(type, step, now);
 
-  /// 未完成：期限；今天休息：哪天出現；已完成的每日 / 每週：什麼時候重新出現。
+  /// 已完成：什麼時候重新出現；每週任務休息中：哪天出現；其它：期限。
   String _subtitle() {
     final next = nextResetFor(type, step, now);
-    if (_resting && next != null) return '${weekdaysText(step)}・${nextResetLabel(next, now)}出現';
-    if (!step.done) return deadlineText(step, type, now);
-    return next == null ? '已完成' : '已完成・${nextResetLabel(next, now)}重新出現';
+    if (step.done) return next == null ? '已完成' : '已完成・${nextResetLabel(next, now)}重新出現';
+    if (_resting && next != null) {
+      // 今天是它的日子但已過晚上 12 點 → 本次已結束；否則是還沒輪到
+      final todayDeadline = effectiveDeadline(type, step, now);
+      final ended = todayDeadline != null && !now.isBefore(todayDeadline);
+      final label = '${nextResetLabel(next, now)}出現';
+      return ended ? '本次已結束・$label' : '${weekdaysText(step)}・$label';
+    }
+    final text = deadlineText(step, type, now);
+    return isStale(type, step, now) ? '$text・已移出通知欄' : text;
   }
 
   @override
   Widget build(BuildContext context) {
     final dim = step.done || _resting; // 已完成或今天休息：顏色變淡
     final deadline = effectiveDeadline(type, step, now); // 每週任務會自動有期限
-    final overdue = !step.done && deadline != null && deadline.isBefore(now);
+    // 只有主線 / 支線會「已逾期」；每週過了 12 點是「本次已結束」
+    final overdue = !step.done && !type.recurring && deadline != null && deadline.isBefore(now);
     final urgent = !step.done && !_resting &&
         deadline != null &&
         deadline.difference(now) < const Duration(hours: 24);
@@ -214,7 +222,7 @@ class StepCard extends StatelessWidget {
                                     style: TextStyle(color: subColor, fontSize: 13),
                                   ),
                                 ),
-                                if (!step.done && step.remindAt != null) ...[
+                                if (!step.done && !type.recurring && step.remindAt != null) ...[
                                   const SizedBox(width: 6),
                                   Icon(Icons.vibration, size: 14, color: subColor),
                                 ],
