@@ -1,22 +1,26 @@
 import 'package:flutter/material.dart';
 
-/// 任務分類，對應原神的「每日 / 主線 / 支線」，再加上沒有期限的「記事」。
-enum QuestType { daily, main, side, memo }
+/// 任務分類，對應原神的「主線 / 支線 / 每日」。
+/// 宣告順序就是畫面上方分頁的順序。
+/// 沒有期限的任務不另外分類：任何分類的細項都可以不設期限。
+enum QuestType { main, side, daily }
 
 extension QuestTypeInfo on QuestType {
   String get label => switch (this) {
-        QuestType.daily => '每日委託',
         QuestType.main => '主線任務',
         QuestType.side => '支線任務',
-        QuestType.memo => '記事',
+        QuestType.daily => '每日委託',
       };
 
   IconData get icon => switch (this) {
-        QuestType.daily => Icons.wb_sunny_outlined,
         QuestType.main => Icons.auto_awesome,
         QuestType.side => Icons.explore_outlined,
-        QuestType.memo => Icons.sticky_note_2_outlined,
+        QuestType.daily => Icons.wb_sunny_outlined,
       };
+
+  /// 從存檔讀分類。舊版的「記事」(memo) 已移除，讀到時歸到支線。
+  static QuestType parse(String name) =>
+      QuestType.values.asNameMap()[name] ?? QuestType.side;
 }
 
 /// 大事件底下的一個細項。每個未完成的細項會在通知欄顯示一則通知，
@@ -82,7 +86,7 @@ class Quest {
   factory Quest.fromJson(Map<String, dynamic> j) => Quest(
         id: j['id'] as int,
         title: j['title'] as String,
-        type: QuestType.values.byName(j['type'] as String),
+        type: QuestTypeInfo.parse(j['type'] as String),
         steps: (j['steps'] as List)
             .map((s) => QuestStep.fromJson(s as Map<String, dynamic>))
             .toList(),
@@ -135,7 +139,7 @@ class AppData {
       Quest(id: d.newId(), title: '整理房間', type: QuestType.side, steps: [
         step('洗衣服', deadline: now.add(const Duration(hours: 20))),
       ]),
-      Quest(id: d.newId(), title: '購物清單', type: QuestType.memo, steps: [
+      Quest(id: d.newId(), title: '購物清單', type: QuestType.side, steps: [
         step('牛奶'),
         step('電池'),
       ]),

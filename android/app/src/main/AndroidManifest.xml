@@ -2,7 +2,7 @@
     <!-- Android 13+ 顯示通知需要的權限 -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
-        android:label="任務"
+        android:label="任務系統"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

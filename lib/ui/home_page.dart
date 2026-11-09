@@ -130,7 +130,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         children: [
           DiamondIcon(size: 16, filled: true),
           SizedBox(width: 10),
-          Text('任務',
+          Text('任務系統',
               style: TextStyle(
                   color: GColors.text, fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 4)),
         ],

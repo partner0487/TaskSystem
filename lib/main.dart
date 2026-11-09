@@ -30,7 +30,7 @@ class QuestApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: '任務',
+      title: '任務系統',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
       // 讓日期 / 時間選擇器顯示中文

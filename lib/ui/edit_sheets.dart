@@ -194,7 +194,7 @@ class _StepFormState extends State<_StepForm> {
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           title: const Text('設定期限'),
-          subtitle: Text(_deadline == null ? '無期限（像記事本一樣）' : formatDateTime(_deadline!)),
+          subtitle: Text(_deadline == null ? '無期限' : formatDateTime(_deadline!)),
           value: _deadline != null,
           onChanged: (on) {
             if (on) {
