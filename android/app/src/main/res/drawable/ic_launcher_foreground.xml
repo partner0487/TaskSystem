@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- App 圖示前景：金框菱形 + 米白內菱形 + 打勾。
+     畫布 108x108，各種形狀的遮罩都只保證顯示中間直徑 66 的圓，所以圖案都放在裡面。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- 菱形後面的金色光暈 -->
+    <path android:pathData="M54,54m-32,0a32,32 0,1 1,64 0a32,32 0,1 1,-64 0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="radial"
+                android:centerX="54" android:centerY="54"
+                android:gradientRadius="32"
+                android:startColor="#55F1D9A6"
+                android:endColor="#00F1D9A6" />
+        </aapt:attr>
+    </path>
+
+    <!-- 外框金色菱形 -->
+    <path
+        android:pathData="M54,25L83,54L54,83L25,54Z"
+        android:strokeColor="#FFD3BC8E"
+        android:strokeWidth="2.6"
+        android:strokeLineJoin="miter" />
+
+    <!-- 內部米白菱形（跟 App 裡選中卡片同色） -->
+    <path android:pathData="M54,32L76,54L54,76L32,54Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="54" android:startY="32"
+                android:endX="54" android:endY="76"
+                android:startColor="#FFF6F0E4"
+                android:endColor="#FFD8C49A" />
+        </aapt:attr>
+    </path>
+
+    <!-- 打勾 -->
+    <path
+        android:pathData="M45,54.5L51.5,61L63.5,48"
+        android:strokeColor="#FF2B3244"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+    <!-- 右上角的小星光 -->
+    <path
+        android:fillColor="#FFF1D9A6"
+        android:pathData="M74,27Q74.6,32.4 80,33Q74.6,33.6 74,39Q73.4,33.6 68,33Q73.4,32.4 74,27Z" />
+</vector>

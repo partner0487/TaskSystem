@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 13+「主題圖示」用的單色版本，系統會依桌布自動上色 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M54,25L83,54L54,83L25,54Z"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="3" />
+    <path
+        android:pathData="M45,54.5L51.5,61L63.5,48"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>
