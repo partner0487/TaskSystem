@@ -184,25 +184,29 @@ class AppData {
         QuestStep(
             id: d.newId(), title: t, note: note, deadline: deadline, done: done, weekdays: weekdays);
 
+    // 給第一次使用的人的教學：照著做一遍就會操作。
     d.quests.addAll([
-      Quest(id: d.newId(), title: '每日委託', type: QuestType.daily, steps: [
-        step('喝水 2000cc'),
-      ]),
-      Quest(id: d.newId(), title: '健身', type: QuestType.weekly, steps: [
-        step('運動 30 分鐘', weekdays: [DateTime.monday, DateTime.wednesday, DateTime.friday]),
-      ]),
-      Quest(id: d.newId(), title: '踏上 Flutter 之旅', type: QuestType.main, steps: [
-        step('安裝開發環境', done: true),
-        step('做出第一個畫面',
-            note: '試著改改看 lib/ui/home_page.dart',
+      Quest(id: d.newId(), title: '新手教學', type: QuestType.main, steps: [
+        step('點一下這張卡片',
+            note: '選中的卡片會展開備註。\n長按卡片可以編輯，往左滑可以刪除。'),
+        step('按右邊的 ✓ 完成這一項', note: '完成後，通知欄裡的這一則也會消失。'),
+        step('拉下通知欄看看',
+            note: '每個未完成的細項都會常駐在通知欄，\n展開通知可以直接按「✓ 完成」，不用打開 App。',
             deadline: now.add(const Duration(days: 3))),
-      ]),
-      Quest(id: d.newId(), title: '整理房間', type: QuestType.side, steps: [
-        step('洗衣服', deadline: now.add(const Duration(hours: 20))),
+        step('用右下角的 ＋ 新增自己的任務',
+            note: '主線、支線可以設期限和震動提醒；\n教學做完可以從標題右邊的 ⋮ 刪除整個「新手教學」。'),
       ]),
       Quest(id: d.newId(), title: '購物清單', type: QuestType.side, steps: [
         step('牛奶'),
         step('電池'),
+      ]),
+      Quest(id: d.newId(), title: '健身', type: QuestType.weekly, steps: [
+        step('運動 30 分鐘',
+            note: '每週任務可以選星期幾，只在那幾天出現。',
+            weekdays: [DateTime.monday, DateTime.wednesday, DateTime.friday]),
+      ]),
+      Quest(id: d.newId(), title: '每日委託', type: QuestType.daily, steps: [
+        step('喝水 2000cc', note: '每日委託每天凌晨 4 點重新出現。'),
       ]),
     ]);
     return d;
