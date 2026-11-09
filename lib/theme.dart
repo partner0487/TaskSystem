@@ -33,6 +33,12 @@ ThemeData buildTheme() {
       bodyColor: GColors.text,
       displayColor: GColors.text,
     ),
+    // 下方「已刪除・復原」提示：米白底、深色字、金色按鈕
+    snackBarTheme: const SnackBarThemeData(
+      backgroundColor: GColors.cardSelected,
+      contentTextStyle: TextStyle(color: GColors.textDark, fontSize: 15),
+      actionTextColor: Color(0xFF9A7B3F),
+    ),
     inputDecorationTheme: const InputDecorationTheme(
       border: OutlineInputBorder(),
       focusedBorder: OutlineInputBorder(

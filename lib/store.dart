@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 
+import 'backup.dart';
 import 'models.dart';
 import 'notifications.dart';
 import 'storage.dart';
@@ -49,6 +52,34 @@ class QuestStore extends ChangeNotifier {
     await Notifier.sync(_data);
   }
 
+  // ---------- 復原 ----------
+
+  /// 上一個可以復原的操作之前的資料快照（只保留一步）。
+  String? _undoSnapshot;
+
+  /// 在刪除 / 打勾 / 匯入之前呼叫，記下操作前的樣子。
+  void _snapshot() => _undoSnapshot = jsonEncode(_data.toJson());
+
+  /// 把資料還原成上一個操作之前的樣子。
+  Future<void> undo() async {
+    final snap = _undoSnapshot;
+    if (snap == null) return;
+    _undoSnapshot = null;
+    _data = AppData.fromJson(jsonDecode(snap) as Map<String, dynamic>);
+    await _commit();
+  }
+
+  // ---------- 備份 ----------
+
+  String exportBackup() => encodeBackup(_data, DateTime.now());
+
+  /// 用備份取代目前所有資料（可以復原）。[data] 來自 [decodeBackup]。
+  Future<void> importBackup(AppData data) async {
+    _snapshot();
+    _data = data..applyResets(DateTime.now());
+    await _commit();
+  }
+
   // ---------- 大事件 ----------
 
   Future<void> addQuest(String title, QuestType type, {String? firstStep}) {
@@ -67,6 +98,7 @@ class QuestStore extends ChangeNotifier {
   }
 
   Future<void> deleteQuest(Quest q) {
+    _snapshot();
     quests.remove(q);
     return _commit();
   }
@@ -105,11 +137,13 @@ class QuestStore extends ChangeNotifier {
   }
 
   Future<void> deleteStep(Quest q, QuestStep s) {
+    _snapshot();
     q.steps.remove(s);
     return _commit();
   }
 
   Future<void> toggleStep(QuestStep s) {
+    _snapshot();
     s.done = !s.done;
     return _commit();
   }

@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import '../backup.dart';
 import '../models.dart';
 import '../store.dart';
 import '../theme.dart';
@@ -82,7 +85,89 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         final r = await showQuestSheet(context, quest: q, initialType: q.type);
         if (r != null) await store.updateQuest(q, title: r.title, type: r.type);
       case 'delete':
-        if (await confirmDelete(context, q.title)) await store.deleteQuest(q);
+        if (await confirmDelete(context, q.title)) {
+          await store.deleteQuest(q);
+          _showUndo('已刪除「${q.title}」');
+        }
+    }
+  }
+
+  Future<void> _deleteStep(Quest q, QuestStep s) async {
+    await store.deleteStep(q, s);
+    _showUndo('已刪除「${s.title}」');
+  }
+
+  Future<void> _toggleStep(QuestStep s) async {
+    await store.toggleStep(s);
+    if (s.done) _showUndo('已完成「${s.title}」');
+  }
+
+  /// 下方跳出「…・復原」的提示，幾秒後自動消失。
+  void _showUndo(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 4),
+        action: SnackBarAction(label: '復原', onPressed: store.undo),
+      ));
+  }
+
+  void _toast(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message), behavior: SnackBarBehavior.floating));
+  }
+
+  // ---------- 備份 ----------
+
+  /// 匯出：跳出 Android 的「儲存到…」畫面（下載、雲端硬碟…），存成 JSON 檔。
+  Future<void> _export() async {
+    final now = DateTime.now();
+    String two(int n) => n.toString().padLeft(2, '0');
+    final name = '任務系統備份_${now.year}-${two(now.month)}-${two(now.day)}.json';
+    try {
+      final uri = await FilePicker.saveFile(
+        dialogTitle: '匯出備份',
+        fileName: name,
+        bytes: utf8.encode(store.exportBackup()),
+        mimeType: 'application/json',
+      );
+      if (uri != null) _toast('已匯出備份：$name');
+    } catch (e) {
+      _toast('匯出失敗：$e');
+    }
+  }
+
+  /// 匯入：選備份檔 → 顯示內容摘要確認 → 取代目前資料（可以復原）。
+  Future<void> _import() async {
+    try {
+      final files = await FilePicker.pickFiles(dialogTitle: '選擇備份檔');
+      if (files.isEmpty) return;
+      final data = decodeBackup(await files.first.xFile.readAsString());
+      if (!mounted) return;
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: GColors.header,
+          title: const Text('匯入備份？'),
+          content: Text('備份內容：${backupSummary(data)}\n\n目前所有任務會被這份備份取代。'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+            TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('匯入')),
+          ],
+        ),
+      );
+      if (ok != true) return;
+      await store.importBackup(data);
+      _showUndo('已匯入備份');
+    } on FormatException catch (e) {
+      _toast(e.message);
+    } catch (e) {
+      _toast('匯入失敗：$e');
     }
   }
 
@@ -146,15 +231,32 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   Widget _buildTitle() {
-    return const Padding(
-      padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 8, 8),
       child: Row(
         children: [
-          DiamondIcon(size: 16, filled: true),
-          SizedBox(width: 10),
-          Text('任務系統',
-              style: TextStyle(
-                  color: GColors.text, fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 4)),
+          const DiamondIcon(size: 16, filled: true),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text('任務系統',
+                style: TextStyle(
+                    color: GColors.text, fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 4)),
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert, color: GColors.sub),
+            color: GColors.card,
+            onSelected: (v) => v == 'export' ? _export() : _import(),
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: 'export',
+                child: ListTile(leading: Icon(Icons.upload_file), title: Text('匯出備份')),
+              ),
+              PopupMenuItem(
+                value: 'import',
+                child: ListTile(leading: Icon(Icons.download), title: Text('匯入備份')),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -279,8 +381,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           color: GColors.overdue.withValues(alpha: 0.6),
                           child: const Icon(Icons.delete_outline),
                         ),
-                        confirmDismiss: (_) => confirmDelete(context, s.title),
-                        onDismissed: (_) => store.deleteStep(q, s),
+                        // 不用確認視窗：刪除後下方會出現「復原」
+                        onDismissed: (_) => _deleteStep(q, s),
                         child: StepCard(
                           step: s,
                           type: q.type,
@@ -289,7 +391,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           onTap: () => setState(
                               () => _selectedStep = _selectedStep == s.id ? null : s.id),
                           onLongPress: () => _editStep(q, s),
-                          onToggle: () => store.toggleStep(s),
+                          onToggle: () => _toggleStep(s),
                         ),
                       ),
                     AddStepButton(onTap: () => _addStep(q)),

@@ -1,7 +1,45 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:task_system/backup.dart';
 import 'package:task_system/models.dart';
 
 void main() {
+  group('備份', () {
+    test('匯出再匯入，內容完全一樣', () {
+      final data = AppData.sample();
+      final back = decodeBackup(encodeBackup(data, DateTime(2026, 11, 10)));
+      expect(back.toJson(), data.toJson());
+      expect(backupSummary(back), '4 個大事件、8 個細項');
+    });
+
+    test('不是備份檔的內容會被拒絕，並給出看得懂的訊息', () {
+      expect(() => decodeBackup('hello'), throwsA(isA<FormatException>()
+          .having((e) => e.message, 'message', '這個檔案不是任務系統的備份檔')));
+      expect(() => decodeBackup('{"a": 1}'), throwsFormatException);
+      expect(() => decodeBackup('[1, 2]'), throwsFormatException);
+    });
+
+    test('較新版本的備份會要求先更新 App', () {
+      final text = jsonEncode({'format': 'task_system_backup', 'version': 99, 'data': {}});
+      expect(() => decodeBackup(text), throwsA(isA<FormatException>()
+          .having((e) => e.message, 'message', contains('較新版本'))));
+    });
+
+    test('內容損毀時給出看得懂的訊息', () {
+      final text = jsonEncode({'format': 'task_system_backup', 'version': 1, 'data': {'quests': 'x'}});
+      expect(() => decodeBackup(text), throwsA(isA<FormatException>()
+          .having((e) => e.message, 'message', contains('損毀'))));
+    });
+
+    test('nextId 太小時自動修正，避免新任務跟舊的撞 id', () {
+      final data = AppData(nextId: 1, quests: [
+        Quest(id: 5, title: 'q', type: QuestType.main, steps: [QuestStep(id: 9, title: 's')]),
+      ]);
+      expect(decodeBackup(encodeBackup(data, DateTime(2026))).nextId, 10);
+    });
+  });
+
   test('存檔轉成 JSON 再讀回來，內容不變', () {
     final data = AppData.sample();
     final back = AppData.fromJson(data.toJson());
