@@ -75,16 +75,26 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   Future<void> _addStep(Quest q) async {
-    final r = await showStepSheet(context);
+    final r = await showStepSheet(context, type: q.type);
     if (r == null) return;
-    await store.addStep(q, title: r.title, note: r.note, deadline: r.deadline);
+    await store.addStep(q,
+        title: r.title,
+        note: r.note,
+        deadline: r.deadline,
+        weekdays: r.weekdays,
+        remindBefore: r.remindBefore);
     _collapsed.remove(q.id);
   }
 
-  Future<void> _editStep(QuestStep s) async {
-    final r = await showStepSheet(context, step: s);
+  Future<void> _editStep(Quest q, QuestStep s) async {
+    final r = await showStepSheet(context, type: q.type, step: s);
     if (r == null) return;
-    await store.updateStep(s, title: r.title, note: r.note, deadline: r.deadline);
+    await store.updateStep(s,
+        title: r.title,
+        note: r.note,
+        deadline: r.deadline,
+        weekdays: r.weekdays,
+        remindBefore: r.remindBefore);
   }
 
   // ---------- 畫面 ----------
@@ -261,7 +271,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           selected: _selectedStep == s.id,
                           onTap: () => setState(
                               () => _selectedStep = _selectedStep == s.id ? null : s.id),
-                          onLongPress: () => _editStep(s),
+                          onLongPress: () => _editStep(q, s),
                           onToggle: () => store.toggleStep(s),
                         ),
                       ),

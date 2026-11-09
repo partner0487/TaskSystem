@@ -4,7 +4,13 @@ import '../models.dart';
 import '../theme.dart';
 
 typedef QuestInput = ({String title, QuestType type, String? firstStep});
-typedef StepInput = ({String title, String note, DateTime? deadline});
+typedef StepInput = ({
+  String title,
+  String note,
+  DateTime? deadline,
+  List<int> weekdays,
+  int? remindBefore,
+});
 
 Future<T?> _sheet<T>(BuildContext context, Widget child) {
   return showModalBottomSheet<T>(
@@ -119,13 +125,15 @@ class _QuestFormState extends State<_QuestForm> {
   }
 }
 
-/// 新增 / 編輯細項。
-Future<StepInput?> showStepSheet(BuildContext context, {QuestStep? step}) {
-  return _sheet<StepInput>(context, _StepForm(step: step));
+/// 新增 / 編輯細項。[type] 是所屬大事件的分類（每週任務才會顯示星期幾）。
+Future<StepInput?> showStepSheet(BuildContext context,
+    {required QuestType type, QuestStep? step}) {
+  return _sheet<StepInput>(context, _StepForm(type: type, step: step));
 }
 
 class _StepForm extends StatefulWidget {
-  const _StepForm({this.step});
+  const _StepForm({required this.type, this.step});
+  final QuestType type;
   final QuestStep? step;
 
   @override
@@ -136,6 +144,9 @@ class _StepFormState extends State<_StepForm> {
   late final _title = TextEditingController(text: widget.step?.title ?? '');
   late final _note = TextEditingController(text: widget.step?.note ?? '');
   late DateTime? _deadline = widget.step?.deadline;
+  late final Set<int> _weekdays = {...?widget.step?.weekdays};
+  // 新的細項預設「1 小時前」震動提醒
+  late int? _remind = widget.step == null ? 60 : widget.step!.remindBefore;
 
   @override
   void dispose() {
@@ -166,8 +177,13 @@ class _StepFormState extends State<_StepForm> {
   void _submit() {
     final title = _title.text.trim();
     if (title.isEmpty) return;
-    Navigator.pop<StepInput>(
-        context, (title: title, note: _note.text.trim(), deadline: _deadline));
+    Navigator.pop<StepInput>(context, (
+      title: title,
+      note: _note.text.trim(),
+      deadline: _deadline,
+      weekdays: _weekdays.toList()..sort(),
+      remindBefore: _remind,
+    ));
   }
 
   @override
@@ -190,6 +206,27 @@ class _StepFormState extends State<_StepForm> {
           maxLines: 5,
           decoration: const InputDecoration(labelText: '備註（可留空）'),
         ),
+        if (widget.type == QuestType.weekly) ...[
+          const SizedBox(height: 16),
+          Text(
+            _weekdays.isEmpty ? '重置日：沒選就是每週一' : '重置日：${weekdaysText(QuestStep(id: 0, title: '', weekdays: _weekdays.toList()))}',
+            style: const TextStyle(color: GColors.sub),
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            children: [
+              for (var d = DateTime.monday; d <= DateTime.sunday; d++)
+                FilterChip(
+                  label: Text(weekNames[d - 1]),
+                  showCheckmark: false,
+                  selected: _weekdays.contains(d),
+                  onSelected: (on) =>
+                      setState(() => on ? _weekdays.add(d) : _weekdays.remove(d)),
+                ),
+            ],
+          ),
+        ],
         const SizedBox(height: 8),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
@@ -204,12 +241,28 @@ class _StepFormState extends State<_StepForm> {
             }
           },
         ),
-        if (_deadline != null)
+        if (_deadline != null) ...[
           TextButton.icon(
             onPressed: _pickDeadline,
             icon: const Icon(Icons.edit_calendar),
             label: const Text('更改期限'),
           ),
+          const SizedBox(height: 4),
+          const Text('震動提醒（不響鈴）', style: TextStyle(color: GColors.sub)),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            children: [
+              for (final m in remindOptions)
+                ChoiceChip(
+                  label: Text(m == null ? '不提醒' : '${durationText(m)}前'),
+                  avatar: m == null ? null : const Icon(Icons.vibration, size: 16),
+                  selected: _remind == m,
+                  onSelected: (_) => setState(() => _remind = m),
+                ),
+            ],
+          ),
+        ],
         _buttons(context, _submit),
       ],
     );

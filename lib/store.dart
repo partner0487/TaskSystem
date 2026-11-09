@@ -29,14 +29,14 @@ class QuestStore extends ChangeNotifier {
   /// 從存檔重新讀取（App 啟動、回到前景、通知欄按了完成之後都會呼叫）。
   Future<void> reload() async {
     _data = await Storage.read();
-    _data.applyDailyReset(DateTime.now());
+    _data.applyResets(DateTime.now());
     loaded = true;
     await _commit();
   }
 
-  /// App 開著的時候定時檢查，跨過凌晨 4 點就重置每日委託。
+  /// App 開著的時候定時檢查，跨過凌晨 4 點就重置每日 / 每週任務。
   Future<void> checkDailyReset() async {
-    if (_data.applyDailyReset(DateTime.now())) await _commit();
+    if (_data.applyResets(DateTime.now())) await _commit();
   }
 
   Future<void> _commit() async {
@@ -70,18 +70,33 @@ class QuestStore extends ChangeNotifier {
   // ---------- 細項 ----------
 
   Future<void> addStep(Quest q,
-      {required String title, String note = '', DateTime? deadline}) {
+      {required String title,
+      String note = '',
+      DateTime? deadline,
+      List<int>? weekdays,
+      int? remindBefore}) {
     q.steps.add(QuestStep(
-        id: _data.newId(), title: title, note: note, deadline: deadline));
+        id: _data.newId(),
+        title: title,
+        note: note,
+        deadline: deadline,
+        weekdays: weekdays,
+        remindBefore: remindBefore));
     return _commit();
   }
 
   Future<void> updateStep(QuestStep s,
-      {required String title, required String note, DateTime? deadline}) {
+      {required String title,
+      required String note,
+      DateTime? deadline,
+      required List<int> weekdays,
+      int? remindBefore}) {
     s
       ..title = title
       ..note = note
-      ..deadline = deadline;
+      ..deadline = deadline
+      ..weekdays = weekdays
+      ..remindBefore = remindBefore;
     return _commit();
   }
 

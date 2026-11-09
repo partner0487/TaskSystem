@@ -1,4 +1,5 @@
 import 'dart:isolate';
+import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:flutter/widgets.dart';
@@ -16,6 +17,10 @@ const _uiPortName = 'quest_ui_port';
 /// 每日委託「凌晨 4 點重新出現」的預約通知，id 用 細項 id + 這個偏移量，
 /// 才不會跟正在顯示的通知（id = 細項 id）互相取消。
 const _resetIdOffset = 1000000;
+
+/// 到期前的震動提醒，id = 細項 id + 這個偏移量。
+const _reminderIdOffset = 2000000;
+const _reminderChannelId = 'reminders';
 
 /// 通知欄的事件（按「完成」、把通知滑掉）由 Android 另外開一個背景 isolate 執行，
 /// 就算 App 完全沒開也一樣。@pragma 讓編譯器不會把它當成沒用到的程式碼刪掉。
@@ -64,7 +69,8 @@ class Notifier {
     final type = r.notificationResponseType;
     final complete = type == NotificationResponseType.selectedNotificationAction &&
         r.actionId == _actionComplete;
-    final dismissed = type == NotificationResponseType.notificationDismissed;    if (!complete && !dismissed) return;
+    final dismissed = type == NotificationResponseType.notificationDismissed;
+    if (!complete && !dismissed) return;
 
     // payload 一定是細項 id（預約重置的通知 id 有加偏移量，不能直接用）
     final stepId = int.tryParse(r.payload ?? '') ?? r.id;
@@ -73,8 +79,9 @@ class Notifier {
 
   /// 讀存檔 → 套用每日重置 →（可選）完成某個細項 → 存檔 → 同步通知欄。
   /// 通知欄事件和開機補發都走這條路。
-  static Future<void> refreshFromStorage({int? completeStepId}) async {    final data = await Storage.read();
-    data.applyDailyReset(DateTime.now());
+  static Future<void> refreshFromStorage({int? completeStepId}) async {
+    final data = await Storage.read();
+    data.applyResets(DateTime.now());
     if (completeStepId != null) {
       for (final s in data.quests.expand((q) => q.steps)) {
         if (s.id == completeStepId) s.done = true;
@@ -88,18 +95,22 @@ class Notifier {
   }
 
   /// 讓通知欄跟資料一致：
-  /// 1. 未完成的細項顯示 / 更新
-  /// 2. 其它通知全部移除
-  /// 3. 已完成的每日委託，預約在下次凌晨 4 點重新出現（App 沒開也會出現）
-  static Future<void> sync(AppData data) async {    final now = DateTime.now();
-    final openIds = <int>{};
-    final resetIds = <int>{};
-    final doneDaily = <(Quest, QuestStep)>[];
+  /// 1. 未完成的細項顯示 / 更新；有設提醒的，預約到期前的震動提醒
+  /// 2. 其它通知、預約全部移除
+  /// 3. 已完成的每日 / 每週任務，預約在下次重置時重新出現（App 沒開也會出現）
+  static Future<void> sync(AppData data) async {
+    final now = DateTime.now();
+    final keepActive = <int>{};
+    final keepPending = <int>{};
+    final resets = <(Quest, QuestStep, DateTime)>[];
+    final reminders = <(Quest, QuestStep, DateTime)>[];
 
     for (final q in data.quests) {
       for (final s in q.steps) {
         if (!s.done) {
-          openIds.add(s.id);
+          keepActive
+            ..add(s.id)
+            ..add(_reminderIdOffset + s.id); // 已經跳出的提醒留著，等使用者自己處理
           await plugin.show(
             id: s.id, // 用細項 id 當通知 id，才能精準取消
             title: s.title,
@@ -107,35 +118,87 @@ class Notifier {
             payload: '${s.id}',
             notificationDetails: _details(q, s, now),
           );
-        } else if (q.type == QuestType.daily) {
-          resetIds.add(_resetIdOffset + s.id);
-          doneDaily.add((q, s));
+          final at = s.remindAt;
+          if (at != null && at.isAfter(now)) {
+            keepPending.add(_reminderIdOffset + s.id);
+            reminders.add((q, s, at));
+          }
+        } else {
+          final at = nextResetFor(q.type, s, now);
+          if (at != null) {
+            keepPending.add(_resetIdOffset + s.id);
+            resets.add((q, s, at));
+          }
         }
       }
     }
 
     // 先清掉不該存在的通知與預約（cancel 會同時取消同 id 的預約，所以要在重新預約之前做）
     for (final n in await plugin.getActiveNotifications()) {
-      if (n.id != null && !openIds.contains(n.id)) await plugin.cancel(id: n.id!);
+      if (n.id != null && !keepActive.contains(n.id)) await plugin.cancel(id: n.id!);
     }
     for (final p in await plugin.pendingNotificationRequests()) {
-      if (!resetIds.contains(p.id)) await plugin.cancel(id: p.id);
+      if (!keepPending.contains(p.id)) await plugin.cancel(id: p.id);
     }
 
-    // 預約下次重置時重新出現。用不精確的鬧鐘（可能晚幾分鐘），不需要額外權限也比較省電。
-    final resetAt = nextResetTime(now);
-    for (final (q, s) in doneDaily) {
+    // 預約下次重置時重新出現。用不精確的鬧鐘（可能晚一點），不需要額外權限也比較省電。
+    for (final (q, s, at) in resets) {
       await plugin.zonedSchedule(
         id: _resetIdOffset + s.id,
-        scheduledDate: tz.TZDateTime.from(resetAt, tz.UTC),
+        scheduledDate: tz.TZDateTime.from(at, tz.UTC),
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
         title: s.title,
-        body: _body(q, s, resetAt),
+        body: _body(q, s, at),
         payload: '${s.id}',
-        notificationDetails: _details(q, s, resetAt),
+        notificationDetails: _details(q, s, at),
       );
     }
+
+    // 到期前的震動提醒要準時，用精確鬧鐘；萬一系統不允許就退回不精確的。
+    for (final (q, s, at) in reminders) {
+      Future<void> schedule(AndroidScheduleMode mode) => plugin.zonedSchedule(
+            id: _reminderIdOffset + s.id,
+            scheduledDate: tz.TZDateTime.from(at, tz.UTC),
+            androidScheduleMode: mode,
+            title: '${durationText(s.remindBefore!)}後到期：${s.title}',
+            body: notificationDeadlineText(s, q.type, at),
+            payload: '${s.id}',
+            notificationDetails: _reminderDetails(q),
+          );
+      try {
+        await schedule(AndroidScheduleMode.exactAllowWhileIdle);
+      } catch (_) {
+        await schedule(AndroidScheduleMode.inexactAllowWhileIdle);
+      }
+    }
   }
+
+  /// 震動提醒：獨立的通知類別，會從畫面上方滑出、震動，但不響鈴。
+  /// 使用者可以在 Android 設定 → 通知 → 任務系統 → 到期提醒 自己調整。
+  static NotificationDetails _reminderDetails(Quest q) => NotificationDetails(
+        android: AndroidNotificationDetails(
+          _reminderChannelId,
+          '到期提醒',
+          channelDescription: '截止前震動提醒（不響鈴）',
+          icon: 'ic_stat_quest',
+          importance: Importance.high, // 從畫面上方滑出
+          priority: Priority.high,
+          playSound: false,
+          enableVibration: true,
+          vibrationPattern: Int64List.fromList([0, 250, 150, 250]), // 震兩下
+          subText: '${q.type.label}・${q.title}',
+          color: const Color(0xFFD3BC8E),
+          category: AndroidNotificationCategory.reminder,
+          actions: const [
+            AndroidNotificationAction(
+              _actionComplete,
+              '✓ 完成',
+              cancelNotification: true,
+              showsUserInterface: false,
+            ),
+          ],
+        ),
+      );
 
   static String _body(Quest q, QuestStep s, DateTime now) => [
         notificationDeadlineText(s, q.type, now),

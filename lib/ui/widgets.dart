@@ -133,9 +133,16 @@ class StepCard extends StatelessWidget {
   final VoidCallback onLongPress;
   final VoidCallback onToggle;
 
+  /// 未完成：期限；已完成的每日 / 每週：什麼時候重新出現。
+  String _subtitle() {
+    if (!step.done) return deadlineText(step, type, now);
+    final next = nextResetFor(type, step, now);
+    return next == null ? '已完成' : '已完成・${nextResetLabel(next, now)}重新出現';
+  }
+
   @override
   Widget build(BuildContext context) {
-    final overdue = !step.done && step.deadline != null && step.deadline!.isBefore(now);
+    final overdue =!step.done && step.deadline != null && step.deadline!.isBefore(now);
     final urgent = !step.done &&
         step.deadline != null &&
         step.deadline!.difference(now) < const Duration(hours: 24);
@@ -193,9 +200,19 @@ class StepCard extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(height: 3),
-                            Text(
-                              step.done ? '已完成' : deadlineText(step, type, now),
-                              style: TextStyle(color: subColor, fontSize: 13),
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    _subtitle(),
+                                    style: TextStyle(color: subColor, fontSize: 13),
+                                  ),
+                                ),
+                                if (!step.done && step.remindAt != null) ...[
+                                  const SizedBox(width: 6),
+                                  Icon(Icons.vibration, size: 14, color: subColor),
+                                ],
+                              ],
                             ),
                             if (selected && step.note.isNotEmpty) ...[
                               const SizedBox(height: 8),

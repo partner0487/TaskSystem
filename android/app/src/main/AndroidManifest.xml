@@ -3,6 +3,12 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <!-- 開機後把通知補回來 -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <!-- 到期前的震動提醒要準時：Android 13+ 用 USE_EXACT_ALARM（安裝時自動允許），
+         Android 12 用 SCHEDULE_EXACT_ALARM -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
+    <uses-permission
+        android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        android:maxSdkVersion="32"/>
     <application
         android:label="任務系統"
         android:name="${applicationName}"
