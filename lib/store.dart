@@ -20,11 +20,15 @@ class QuestStore extends ChangeNotifier {
     return [...open, ...closed];
   }
 
-  int openStepCount(QuestType type) => quests
-      .where((q) => q.type == type)
-      .expand((q) => q.steps)
-      .where((s) => !s.done)
-      .length;
+  /// 分頁上的數字：今天該做、還沒做的細項數。
+  int openStepCount(QuestType type) {
+    final now = DateTime.now();
+    return quests
+        .where((q) => q.type == type)
+        .expand((q) => q.steps)
+        .where((s) => !s.done && isActiveOn(type, s, now))
+        .length;
+  }
 
   /// 從存檔重新讀取（App 啟動、回到前景、通知欄按了完成之後都會呼叫）。
   Future<void> reload() async {

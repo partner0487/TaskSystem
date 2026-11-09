@@ -228,8 +228,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           _collapsed.contains(key) ? _collapsed.remove(key) : _collapsed.add(key);
         });
 
-    // 未完成的細項排前面
-    final steps = [...q.steps.where((s) => !s.done), ...q.steps.where((s) => s.done)];
+    // 排序：今天要做的 → 今天休息的（每週任務的非指定日）→ 已完成
+    bool active(QuestStep s) => isActiveOn(q.type, s, _now);
+    final steps = [
+      ...q.steps.where((s) => !s.done && active(s)),
+      ...q.steps.where((s) => !s.done && !active(s)),
+      ...q.steps.where((s) => s.done),
+    ];
 
     return [
       Padding(

@@ -133,20 +133,25 @@ class StepCard extends StatelessWidget {
   final VoidCallback onLongPress;
   final VoidCallback onToggle;
 
-  /// 未完成：期限；已完成的每日 / 每週：什麼時候重新出現。
+  /// 今天不是它的日子（例如週一的「週六日籃球」）
+  bool get _resting => !isActiveOn(type, step, now);
+
+  /// 未完成：期限；今天休息：哪天出現；已完成的每日 / 每週：什麼時候重新出現。
   String _subtitle() {
-    if (!step.done) return deadlineText(step, type, now);
     final next = nextResetFor(type, step, now);
+    if (_resting && next != null) return '${weekdaysText(step)}・${nextResetLabel(next, now)}出現';
+    if (!step.done) return deadlineText(step, type, now);
     return next == null ? '已完成' : '已完成・${nextResetLabel(next, now)}重新出現';
   }
 
   @override
   Widget build(BuildContext context) {
-    final overdue =!step.done && step.deadline != null && step.deadline!.isBefore(now);
-    final urgent = !step.done &&
+    final dim = step.done || _resting; // 已完成或今天休息：顏色變淡
+    final overdue = !step.done && step.deadline != null && step.deadline!.isBefore(now);
+    final urgent = !step.done && !_resting &&
         step.deadline != null &&
         step.deadline!.difference(now) < const Duration(hours: 24);
-    final titleColor = selected ? GColors.textDark : (step.done ? GColors.sub : GColors.text);
+    final titleColor = selected ? GColors.textDark : (dim ? GColors.sub : GColors.text);
     final subColor = overdue
         ? GColors.overdue
         : (selected ? GColors.textDark.withValues(alpha: 0.75) : GColors.sub);

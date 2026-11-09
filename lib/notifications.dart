@@ -107,10 +107,18 @@ class Notifier {
 
     for (final q in data.quests) {
       for (final s in q.steps) {
+        // 到期提醒：只要還沒完成就照常提醒
         if (!s.done) {
-          keepActive
-            ..add(s.id)
-            ..add(_reminderIdOffset + s.id); // 已經跳出的提醒留著，等使用者自己處理
+          keepActive.add(_reminderIdOffset + s.id); // 已經跳出的提醒留著，等使用者自己處理
+          final at = s.remindAt;
+          if (at != null && at.isAfter(now)) {
+            keepPending.add(_reminderIdOffset + s.id);
+            reminders.add((q, s, at));
+          }
+        }
+
+        if (!s.done && isActiveOn(q.type, s, now)) {
+          keepActive.add(s.id);
           await plugin.show(
             id: s.id, // 用細項 id 當通知 id，才能精準取消
             title: s.title,
@@ -118,12 +126,9 @@ class Notifier {
             payload: '${s.id}',
             notificationDetails: _details(q, s, now),
           );
-          final at = s.remindAt;
-          if (at != null && at.isAfter(now)) {
-            keepPending.add(_reminderIdOffset + s.id);
-            reminders.add((q, s, at));
-          }
         } else {
+          // 已完成的每日 / 每週，或今天不是它的日子（例如週一的「週六日籃球」）：
+          // 預約在下一個該出現的日子凌晨 4 點出現
           final at = nextResetFor(q.type, s, now);
           if (at != null) {
             keepPending.add(_resetIdOffset + s.id);

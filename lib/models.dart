@@ -233,6 +233,11 @@ DateTime nextResetTime(DateTime now) {
   return now.isBefore(today4) ? today4 : DateTime(now.year, now.month, now.day + 1, 4);
 }
 
+/// 今天（以凌晨 4 點為分界）這個細項該不該出現。
+/// 有勾星期幾的每週任務只在那幾天出現；其它都是每天出現（直到完成）。
+bool isActiveOn(QuestType type, QuestStep s, DateTime now) =>
+    type != QuestType.weekly || s.weekdays.isEmpty || s.weekdays.contains(gameDay(now).weekday);
+
 /// 這個細項下一次被重置（重新出現）的時間；主線 / 支線不會重置，回傳 null。
 DateTime? nextResetFor(QuestType type, QuestStep s, DateTime now) {
   final first = nextResetTime(now);

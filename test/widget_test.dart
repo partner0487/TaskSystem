@@ -66,6 +66,19 @@ void main() {
     expect(mon.quests[0].steps[0].done, isFalse);
   });
 
+  test('週六日籃球：週一不出現，週六、週日出現', () {
+    final s = QuestStep(id: 1, title: '籃球', weekdays: const [DateTime.saturday, DateTime.sunday]);
+    expect(isActiveOn(QuestType.weekly, s, DateTime(2026, 11, 9, 23)), isFalse); // 週一
+    expect(isActiveOn(QuestType.weekly, s, DateTime(2026, 11, 14, 9)), isTrue); // 週六
+    expect(isActiveOn(QuestType.weekly, s, DateTime(2026, 11, 16, 3)), isTrue); // 週一凌晨 3 點還算週日
+    expect(isActiveOn(QuestType.weekly, s, DateTime(2026, 11, 16, 4)), isFalse); // 週一 4 點過後
+    // 週一新增的籃球，下次在週六凌晨 4 點出現
+    expect(nextResetFor(QuestType.weekly, s, DateTime(2026, 11, 9, 23)), DateTime(2026, 11, 14, 4));
+    // 沒勾星期幾的每週任務、其它分類：每天都出現
+    expect(isActiveOn(QuestType.weekly, QuestStep(id: 2, title: 'x'), DateTime(2026, 11, 9)), isTrue);
+    expect(isActiveOn(QuestType.daily, s, DateTime(2026, 11, 9)), isTrue);
+  });
+
   test('下次重新出現的時間與文字', () {
     final s = QuestStep(id: 1, title: '運動', weekdays: const [1, 3, 5]);
     final mon = DateTime(2026, 11, 9, 20); // 週一晚上
