@@ -109,9 +109,8 @@ class Notifier {
           ongoing: true, // 常駐（Android 14+ 仍可被滑掉，回到 App 時會補回來）
           autoCancel: false,
           onlyAlertOnce: true,
+          // 不要自己指定 when：Android 會直接丟掉時間戳太舊（例如 1970 年）的通知
           showWhen: false,
-          // 固定的 when，避免每次更新時通知順序亂跳
-          when: s.id * 1000,
           subText: '${q.type.label}・${q.title}',
           color: const Color(0xFFD3BC8E),
           category: AndroidNotificationCategory.reminder,
