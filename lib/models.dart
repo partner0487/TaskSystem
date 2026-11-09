@@ -288,25 +288,54 @@ const remindOptions = <int?>[null, 10, 60, 1440];
 /// 通知欄用的期限文字。通知發出後 App 不一定會再更新它，
 /// 所以用固定的截止時間（「截止 11/12（三）18:00」），不用會過時的「剩幾小時」。
 String notificationDeadlineText(QuestStep s, QuestType type, DateTime now) {
-  final d = s.deadline;
+  final d = effectiveDeadline(type, s, now);
   if (d == null) return _noDeadlineText(s, type);
-  String two(int n) => n.toString().padLeft(2, '0');
-  final text = '${d.month}/${d.day}（${weekNames[d.weekday - 1]}）${two(d.hour)}:${two(d.minute)}';
+  final text = formatDateTime(d, withWeekday: true);
   return d.isBefore(now) ? '已逾期・$text' : '截止 $text';
+}
+
+/// 實際用來倒數的截止時間：
+/// - 有自己設定期限 → 用設定的
+/// - 每週任務、有選星期幾 → 當天晚上 12 點
+/// - 每週任務、沒選星期幾 → 這週日晚上 12 點
+/// - 其它 → 沒有期限
+DateTime? effectiveDeadline(QuestType type, QuestStep s, DateTime now) {
+  if (s.deadline != null) return s.deadline;
+  if (type != QuestType.weekly) return null;
+  final day = gameDay(now);
+  if (s.weekdays.isNotEmpty) {
+    if (!s.weekdays.contains(day.weekday)) return null; // 今天不是它的日子
+    return DateTime(day.year, day.month, day.day + 1); // 當天 24:00
+  }
+  return DateTime(day.year, day.month, day.day + (DateTime.sunday - day.weekday) + 1); // 週日 24:00
+}
+
+/// 倒數文字：
+/// - 1 天以上：「剩 2 天 5 小時」
+/// - 1 天以內：「剩 5 小時 30 分」
+/// - 1 小時以內：「剩 12 分 30 秒」
+String remainingText(Duration left) {
+  if (left.inDays >= 1) return '剩 ${left.inDays} 天 ${left.inHours % 24} 小時';
+  if (left.inHours >= 1) return '剩 ${left.inHours} 小時 ${left.inMinutes % 60} 分';
+  return '剩 ${left.inMinutes} 分 ${left.inSeconds % 60} 秒';
 }
 
 /// 「剩 2 天 5 小時」、「無期限」、「已逾期」之類的文字。
 String deadlineText(QuestStep s, QuestType type, DateTime now) {
-  final d = s.deadline;
+  final d = effectiveDeadline(type, s, now);
   if (d == null) return _noDeadlineText(s, type);
-  final diff = d.difference(now);
-  if (diff.isNegative) return '已逾期・${formatDateTime(d)}';
-  if (diff.inDays >= 1) return '剩 ${diff.inDays} 天 ${diff.inHours % 24} 小時';
-  if (diff.inHours >= 1) return '剩 ${diff.inHours} 小時 ${diff.inMinutes % 60} 分';
-  return '剩 ${diff.inMinutes} 分鐘';
+  final left = d.difference(now);
+  if (left.isNegative) return '已逾期・${formatDateTime(d)}';
+  return remainingText(left);
 }
 
-String formatDateTime(DateTime d) {
+/// 「11/15 18:00」；午夜顯示成前一天的「24:00」，比較符合「當天晚上 12 點前」的直覺。
+/// [withWeekday] 時加上星期：「11/15（日）24:00」。
+String formatDateTime(DateTime d, {bool withWeekday = false}) {
   String two(int n) => n.toString().padLeft(2, '0');
-  return '${d.month}/${d.day} ${two(d.hour)}:${two(d.minute)}';
+  final midnight = d.hour == 0 && d.minute == 0;
+  final day = midnight ? DateTime(d.year, d.month, d.day - 1) : d;
+  final week = withWeekday ? '（${weekNames[day.weekday - 1]}）' : ' ';
+  final time = midnight ? '24:00' : '${two(d.hour)}:${two(d.minute)}';
+  return '${day.month}/${day.day}$week$time';
 }

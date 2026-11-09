@@ -79,6 +79,38 @@ void main() {
     expect(isActiveOn(QuestType.daily, s, DateTime(2026, 11, 9)), isTrue);
   });
 
+  test('每週任務的自動期限：有選星期幾 = 當天 24:00；沒選 = 週日 24:00', () {
+    final ball = QuestStep(id: 1, title: '籃球', weekdays: const [DateTime.saturday, DateTime.sunday]);
+    final sat = DateTime(2026, 11, 14, 20); // 週六晚上 8 點
+    expect(effectiveDeadline(QuestType.weekly, ball, sat), DateTime(2026, 11, 15));
+    expect(deadlineText(ball, QuestType.weekly, sat), '剩 4 小時 0 分');
+    expect(notificationDeadlineText(ball, QuestType.weekly, sat), '截止 11/14（六）24:00');
+    expect(effectiveDeadline(QuestType.weekly, ball, DateTime(2026, 11, 9, 12)), isNull); // 週一休息
+
+    final anyDay = QuestStep(id: 2, title: '打掃');
+    final mon = DateTime(2026, 11, 9, 12); // 週一中午
+    expect(effectiveDeadline(QuestType.weekly, anyDay, mon), DateTime(2026, 11, 16));
+    expect(deadlineText(anyDay, QuestType.weekly, mon), '剩 6 天 12 小時');
+
+    // 自己設的期限優先；主線沒設期限就沒有
+    final custom = QuestStep(id: 3, title: 'x', deadline: DateTime(2026, 11, 10, 9));
+    expect(effectiveDeadline(QuestType.weekly, custom, mon), DateTime(2026, 11, 10, 9));
+    expect(effectiveDeadline(QuestType.main, anyDay, mon), isNull);
+  });
+
+  test('倒數文字的三種格式', () {
+    expect(remainingText(const Duration(days: 2, hours: 5, minutes: 9)), '剩 2 天 5 小時');
+    expect(remainingText(const Duration(hours: 5, minutes: 30, seconds: 9)), '剩 5 小時 30 分');
+    expect(remainingText(const Duration(minutes: 12, seconds: 30)), '剩 12 分 30 秒');
+    expect(remainingText(const Duration(seconds: 7)), '剩 0 分 7 秒');
+  });
+
+  test('午夜顯示成前一天的 24:00', () {
+    expect(formatDateTime(DateTime(2026, 11, 16)), '11/15 24:00');
+    expect(formatDateTime(DateTime(2026, 11, 16), withWeekday: true), '11/15（日）24:00');
+    expect(formatDateTime(DateTime(2026, 11, 16, 9, 5)), '11/16 09:05');
+  });
+
   test('下次重新出現的時間與文字', () {
     final s = QuestStep(id: 1, title: '運動', weekdays: const [1, 3, 5]);
     final mon = DateTime(2026, 11, 9, 20); // 週一晚上

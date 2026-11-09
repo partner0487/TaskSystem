@@ -212,7 +212,7 @@ class Notifier {
 
   static NotificationDetails _details(Quest q, QuestStep s, DateTime now) {
     // 24 小時內到期：通知右上角顯示會自己倒數的計時器
-    final d = s.deadline;
+    final d = effectiveDeadline(q.type, s, now); // 每週任務會自動有期限
     final countdown = d != null && d.isAfter(now) && d.difference(now) <= const Duration(hours: 24);
 
     return NotificationDetails(

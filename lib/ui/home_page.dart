@@ -30,12 +30,24 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // 每 30 秒更新「剩幾小時」的文字，順便檢查是否跨過每日重置時間
-    _ticker = Timer.periodic(const Duration(seconds: 30), (_) {
-      setState(() => _now = DateTime.now());
-      store.checkDailyReset();
+    // 倒數文字的更新：有任務剩不到 1 小時（顯示到秒）就每秒重畫，
+    // 否則每分鐘重畫一次就夠了（比較省電）。換分鐘時順便檢查是否跨過每日重置時間。
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      final now = DateTime.now();
+      final newMinute = now.minute != _now.minute;
+      if (newMinute || _showsSeconds(now)) setState(() => _now = now);
+      if (newMinute) store.checkDailyReset();
     });
   }
+
+  /// 目前有沒有任務剩不到 1 小時（倒數會顯示秒數）。
+  bool _showsSeconds(DateTime now) => store.quests.any((q) => q.steps.any((s) {
+        if (s.done) return false;
+        final d = effectiveDeadline(q.type, s, now);
+        if (d == null) return false;
+        final left = d.difference(now);
+        return left > const Duration(seconds: -1) && left < const Duration(hours: 1);
+      }));
 
   @override
   void dispose() {

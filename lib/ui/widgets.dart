@@ -147,10 +147,11 @@ class StepCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dim = step.done || _resting; // 已完成或今天休息：顏色變淡
-    final overdue = !step.done && step.deadline != null && step.deadline!.isBefore(now);
+    final deadline = effectiveDeadline(type, step, now); // 每週任務會自動有期限
+    final overdue = !step.done && deadline != null && deadline.isBefore(now);
     final urgent = !step.done && !_resting &&
-        step.deadline != null &&
-        step.deadline!.difference(now) < const Duration(hours: 24);
+        deadline != null &&
+        deadline.difference(now) < const Duration(hours: 24);
     final titleColor = selected ? GColors.textDark : (dim ? GColors.sub : GColors.text);
     final subColor = overdue
         ? GColors.overdue
