@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
@@ -17,6 +19,15 @@ Future<void> main() async {
   // 畫面出來後再要通知權限，然後讀資料並同步通知欄
   await Notifier.requestPermission();
   await store.reload();
+}
+
+/// 手機開機後，Android 原生的 BootReceiver 會啟動一個沒有畫面的 Flutter 引擎執行這裡，
+/// 把未完成任務的通知補回通知欄（重開機會清空所有通知）。
+@pragma('vm:entry-point')
+Future<void> bootSync() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  DartPluginRegistrant.ensureInitialized();
+  await Notifier.refreshFromStorage();
 }
 
 class QuestApp extends StatelessWidget {

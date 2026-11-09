@@ -29,28 +29,14 @@ class QuestStore extends ChangeNotifier {
   /// 從存檔重新讀取（App 啟動、回到前景、通知欄按了完成之後都會呼叫）。
   Future<void> reload() async {
     _data = await Storage.read();
-    _applyDailyReset();
+    _data.applyDailyReset(DateTime.now());
     loaded = true;
     await _commit();
   }
 
-  /// 每分鐘檢查一次，跨過凌晨 4 點就重置每日委託。
+  /// App 開著的時候定時檢查，跨過凌晨 4 點就重置每日委託。
   Future<void> checkDailyReset() async {
-    if (_applyDailyReset()) await _commit();
-  }
-
-  bool _applyDailyReset() {
-    final key = resetDayKey(DateTime.now());
-    if (_data.lastReset == key) return false;
-    if (_data.lastReset != null) {
-      for (final q in quests.where((q) => q.type == QuestType.daily)) {
-        for (final s in q.steps) {
-          s.done = false;
-        }
-      }
-    }
-    _data.lastReset = key;
-    return true;
+    if (_data.applyDailyReset(DateTime.now())) await _commit();
   }
 
   Future<void> _commit() async {

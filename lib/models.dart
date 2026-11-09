@@ -104,6 +104,22 @@ class AppData {
 
   int newId() => nextId++;
 
+  /// 跨過凌晨 4 點就把每日委託改回未完成。有變動時回傳 true。
+  /// App 畫面、通知欄的背景處理、開機補發都會呼叫，所以放在資料層。
+  bool applyDailyReset(DateTime now) {
+    final key = resetDayKey(now);
+    if (lastReset == key) return false;
+    if (lastReset != null) {
+      for (final q in quests.where((q) => q.type == QuestType.daily)) {
+        for (final s in q.steps) {
+          s.done = false;
+        }
+      }
+    }
+    lastReset = key;
+    return true;
+  }
+
   Map<String, dynamic> toJson() => {
         'nextId': nextId,
         'lastReset': lastReset,
@@ -152,6 +168,23 @@ class AppData {
 String resetDayKey(DateTime now) {
   final d = now.subtract(const Duration(hours: 4));
   return '${d.year}-${d.month}-${d.day}';
+}
+
+/// 下一次每日重置的時間（凌晨 4:00）。
+DateTime nextResetTime(DateTime now) {
+  final today4 = DateTime(now.year, now.month, now.day, 4);
+  return now.isBefore(today4) ? today4 : DateTime(now.year, now.month, now.day + 1, 4);
+}
+
+/// 通知欄用的期限文字。通知發出後 App 不一定會再更新它，
+/// 所以用固定的截止時間（「截止 11/12（三）18:00」），不用會過時的「剩幾小時」。
+String notificationDeadlineText(QuestStep s, QuestType type, DateTime now) {
+  final d = s.deadline;
+  if (d == null) return type == QuestType.daily ? '每日 04:00 重置' : '無期限';
+  const week = ['一', '二', '三', '四', '五', '六', '日'];
+  String two(int n) => n.toString().padLeft(2, '0');
+  final text = '${d.month}/${d.day}（${week[d.weekday - 1]}）${two(d.hour)}:${two(d.minute)}';
+  return d.isBefore(now) ? '已逾期・$text' : '截止 $text';
 }
 
 /// 「剩 2 天 5 小時」、「無期限」、「已逾期」之類的文字。

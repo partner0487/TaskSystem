@@ -3,6 +3,7 @@ import 'dart:ui';
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/timezone.dart' as tz;
 
 import 'models.dart';
 import 'storage.dart';
@@ -12,10 +13,14 @@ const _channelName = '待辦任務';
 const _actionComplete = 'complete';
 const _uiPortName = 'quest_ui_port';
 
-/// 使用者在通知欄按「完成」時，Android 會另外開一個背景 isolate 執行這個函式，
+/// 每日委託「凌晨 4 點重新出現」的預約通知，id 用 細項 id + 這個偏移量，
+/// 才不會跟正在顯示的通知（id = 細項 id）互相取消。
+const _resetIdOffset = 1000000;
+
+/// 通知欄的事件（按「完成」、把通知滑掉）由 Android 另外開一個背景 isolate 執行，
 /// 就算 App 完全沒開也一樣。@pragma 讓編譯器不會把它當成沒用到的程式碼刪掉。
 @pragma('vm:entry-point')
-Future<void> onBackgroundNotificationAction(NotificationResponse r) async {
+Future<void> onBackgroundNotificationResponse(NotificationResponse r) async {
   WidgetsFlutterBinding.ensureInitialized();
   DartPluginRegistrant.ensureInitialized();
   await Notifier.handleResponse(r);
@@ -30,14 +35,14 @@ class Notifier {
       plugin.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
 
-  /// [onDataChanged]：背景改了資料（在通知欄按了完成）時，叫畫面重新讀取。
+  /// [onDataChanged]：背景改了資料（在通知欄按了完成等）時，叫畫面重新讀取。
   static Future<void> init({required Future<void> Function() onDataChanged}) async {
     await plugin.initialize(
       settings: const InitializationSettings(
         android: AndroidInitializationSettings('ic_stat_quest'),
       ),
       onDidReceiveNotificationResponse: handleResponse,
-      onDidReceiveBackgroundNotificationResponse: onBackgroundNotificationAction,
+      onDidReceiveBackgroundNotificationResponse: onBackgroundNotificationResponse,
     );
 
     // 背景 isolate 改完資料後會傳訊息過來，這邊收到就重新讀取
@@ -51,78 +56,127 @@ class Notifier {
     await _android?.requestNotificationsPermission();
   }
 
-  /// 處理通知的點擊。只處理「完成」按鈕，點通知本身只會打開 App。
+  /// 通知欄的事件：
+  /// - 按「✓ 完成」→ 把那個細項標成完成
+  /// - 把通知滑掉 → 什麼都不改，重新同步時就會把它補回來（滑不掉的效果）
+  /// - 點通知本身 → 只是打開 App，不用處理
   static Future<void> handleResponse(NotificationResponse r) async {
-    if (r.actionId != _actionComplete) return;
-    final stepId = r.id ?? int.tryParse(r.payload ?? '');
-    if (stepId == null) return;
+    final type = r.notificationResponseType;
+    final complete = type == NotificationResponseType.selectedNotificationAction &&
+        r.actionId == _actionComplete;
+    final dismissed = type == NotificationResponseType.notificationDismissed;    if (!complete && !dismissed) return;
 
-    final data = await Storage.read();
-    for (final s in data.quests.expand((q) => q.steps)) {
-      if (s.id == stepId) s.done = true;
+    // payload 一定是細項 id（預約重置的通知 id 有加偏移量，不能直接用）
+    final stepId = int.tryParse(r.payload ?? '') ?? r.id;
+    await refreshFromStorage(completeStepId: complete ? stepId : null);
+  }
+
+  /// 讀存檔 → 套用每日重置 →（可選）完成某個細項 → 存檔 → 同步通知欄。
+  /// 通知欄事件和開機補發都走這條路。
+  static Future<void> refreshFromStorage({int? completeStepId}) async {    final data = await Storage.read();
+    data.applyDailyReset(DateTime.now());
+    if (completeStepId != null) {
+      for (final s in data.quests.expand((q) => q.steps)) {
+        if (s.id == completeStepId) s.done = true;
+      }
     }
     await Storage.write(data);
-    // 通知本身會因為 cancelNotification: true 自動消失
+    await sync(data);
 
     // 如果 App 正開著，通知畫面更新
     IsolateNameServer.lookupPortByName(_uiPortName)?.send('changed');
   }
 
-  /// 讓通知欄跟資料一致：未完成的細項顯示 / 更新，其它的全部移除。
-  static Future<void> sync(AppData data) async {
-    final now = DateTime.now();
+  /// 讓通知欄跟資料一致：
+  /// 1. 未完成的細項顯示 / 更新
+  /// 2. 其它通知全部移除
+  /// 3. 已完成的每日委託，預約在下次凌晨 4 點重新出現（App 沒開也會出現）
+  static Future<void> sync(AppData data) async {    final now = DateTime.now();
     final openIds = <int>{};
+    final resetIds = <int>{};
+    final doneDaily = <(Quest, QuestStep)>[];
 
     for (final q in data.quests) {
-      for (final s in q.steps.where((s) => !s.done)) {
-        openIds.add(s.id);
-        await _show(q, s, now);
+      for (final s in q.steps) {
+        if (!s.done) {
+          openIds.add(s.id);
+          await plugin.show(
+            id: s.id, // 用細項 id 當通知 id，才能精準取消
+            title: s.title,
+            body: _body(q, s, now),
+            payload: '${s.id}',
+            notificationDetails: _details(q, s, now),
+          );
+        } else if (q.type == QuestType.daily) {
+          resetIds.add(_resetIdOffset + s.id);
+          doneDaily.add((q, s));
+        }
       }
     }
 
-    final active = await plugin.getActiveNotifications();
-    for (final n in active) {
-      if (n.id != null && !openIds.contains(n.id)) {
-        await plugin.cancel(id: n.id!);
-      }
+    // 先清掉不該存在的通知與預約（cancel 會同時取消同 id 的預約，所以要在重新預約之前做）
+    for (final n in await plugin.getActiveNotifications()) {
+      if (n.id != null && !openIds.contains(n.id)) await plugin.cancel(id: n.id!);
+    }
+    for (final p in await plugin.pendingNotificationRequests()) {
+      if (!resetIds.contains(p.id)) await plugin.cancel(id: p.id);
+    }
+
+    // 預約下次重置時重新出現。用不精確的鬧鐘（可能晚幾分鐘），不需要額外權限也比較省電。
+    final resetAt = nextResetTime(now);
+    for (final (q, s) in doneDaily) {
+      await plugin.zonedSchedule(
+        id: _resetIdOffset + s.id,
+        scheduledDate: tz.TZDateTime.from(resetAt, tz.UTC),
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        title: s.title,
+        body: _body(q, s, resetAt),
+        payload: '${s.id}',
+        notificationDetails: _details(q, s, resetAt),
+      );
     }
   }
 
-  static Future<void> _show(Quest q, QuestStep s, DateTime now) {
-    final body = [
-      deadlineText(s, q.type, now),
-      if (s.note.isNotEmpty) s.note,
-    ].join('・');
+  static String _body(Quest q, QuestStep s, DateTime now) => [
+        notificationDeadlineText(s, q.type, now),
+        if (s.note.isNotEmpty) s.note,
+      ].join('・');
 
-    return plugin.show(
-      id: s.id, // 用細項 id 當通知 id，才能精準取消
-      title: s.title,
-      body: body,
-      payload: '${s.id}',
-      notificationDetails: NotificationDetails(
-        android: AndroidNotificationDetails(
-          _channelId,
-          _channelName,
-          channelDescription: '尚未完成的任務會常駐在通知欄',
-          importance: Importance.low, // 不響鈴、不跳出，安靜地待在通知欄
-          priority: Priority.low,
-          ongoing: true, // 常駐（Android 14+ 仍可被滑掉，回到 App 時會補回來）
-          autoCancel: false,
-          onlyAlertOnce: true,
-          // 不要自己指定 when：Android 會直接丟掉時間戳太舊（例如 1970 年）的通知
-          showWhen: false,
-          subText: '${q.type.label}・${q.title}',
-          color: const Color(0xFFD3BC8E),
-          category: AndroidNotificationCategory.reminder,
-          actions: const [
-            AndroidNotificationAction(
-              _actionComplete,
-              '✓ 完成',
-              cancelNotification: true,
-              showsUserInterface: false,
-            ),
-          ],
-        ),
+  static NotificationDetails _details(Quest q, QuestStep s, DateTime now) {
+    // 24 小時內到期：通知右上角顯示會自己倒數的計時器
+    final d = s.deadline;
+    final countdown = d != null && d.isAfter(now) && d.difference(now) <= const Duration(hours: 24);
+
+    return NotificationDetails(
+      android: AndroidNotificationDetails(
+        _channelId,
+        _channelName,
+        channelDescription: '尚未完成的任務會常駐在通知欄',
+        icon: 'ic_stat_quest', // 背景 isolate 也能正確顯示圖示
+        importance: Importance.low, // 不響鈴、不跳出，安靜地待在通知欄
+        priority: Priority.low,
+        ongoing: true,
+        autoCancel: false,
+        onlyAlertOnce: true,
+        // 被滑掉時通知背景 isolate，重新補上（App 沒開也會觸發）
+        dismissIsolate: NotificationDismissedIsolate.background,
+        // 只有倒數時才指定 when（截止時間在未來）。
+        // 不要指定過去的時間：Android 會直接丟掉時間戳太舊的通知。
+        showWhen: countdown,
+        when: countdown ? d.millisecondsSinceEpoch : null,
+        usesChronometer: countdown,
+        chronometerCountDown: countdown,
+        subText: '${q.type.label}・${q.title}',
+        color: const Color(0xFFD3BC8E),
+        category: AndroidNotificationCategory.reminder,
+        actions: const [
+          AndroidNotificationAction(
+            _actionComplete,
+            '✓ 完成',
+            cancelNotification: true,
+            showsUserInterface: false,
+          ),
+        ],
       ),
     );
   }
