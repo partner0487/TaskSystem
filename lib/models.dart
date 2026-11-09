@@ -1,0 +1,169 @@
+import 'package:flutter/material.dart';
+
+/// 任務分類，對應原神的「每日 / 主線 / 支線」，再加上沒有期限的「記事」。
+enum QuestType { daily, main, side, memo }
+
+extension QuestTypeInfo on QuestType {
+  String get label => switch (this) {
+        QuestType.daily => '每日委託',
+        QuestType.main => '主線任務',
+        QuestType.side => '支線任務',
+        QuestType.memo => '記事',
+      };
+
+  IconData get icon => switch (this) {
+        QuestType.daily => Icons.wb_sunny_outlined,
+        QuestType.main => Icons.auto_awesome,
+        QuestType.side => Icons.explore_outlined,
+        QuestType.memo => Icons.sticky_note_2_outlined,
+      };
+}
+
+/// 大事件底下的一個細項。每個未完成的細項會在通知欄顯示一則通知，
+/// 通知 id 就是細項的 id。
+class QuestStep {
+  QuestStep({
+    required this.id,
+    required this.title,
+    this.note = '',
+    this.deadline,
+    this.done = false,
+  });
+
+  final int id;
+  String title;
+  String note;
+  DateTime? deadline; // null 表示沒有時間限制
+  bool done;
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'title': title,
+        'note': note,
+        'deadline': deadline?.toIso8601String(),
+        'done': done,
+      };
+
+  factory QuestStep.fromJson(Map<String, dynamic> j) => QuestStep(
+        id: j['id'] as int,
+        title: j['title'] as String,
+        note: (j['note'] as String?) ?? '',
+        deadline: j['deadline'] == null
+            ? null
+            : DateTime.parse(j['deadline'] as String),
+        done: (j['done'] as bool?) ?? false,
+      );
+}
+
+/// 大事件，例如「異象」，底下有多個細項。
+class Quest {
+  Quest({
+    required this.id,
+    required this.title,
+    required this.type,
+    List<QuestStep>? steps,
+  }) : steps = steps ?? [];
+
+  final int id;
+  String title;
+  QuestType type;
+  final List<QuestStep> steps;
+
+  bool get done => steps.isNotEmpty && steps.every((s) => s.done);
+  int get doneCount => steps.where((s) => s.done).length;
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'title': title,
+        'type': type.name,
+        'steps': steps.map((s) => s.toJson()).toList(),
+      };
+
+  factory Quest.fromJson(Map<String, dynamic> j) => Quest(
+        id: j['id'] as int,
+        title: j['title'] as String,
+        type: QuestType.values.byName(j['type'] as String),
+        steps: (j['steps'] as List)
+            .map((s) => QuestStep.fromJson(s as Map<String, dynamic>))
+            .toList(),
+      );
+}
+
+/// 整個 App 存檔的內容。
+class AppData {
+  AppData({required this.nextId, this.lastReset, List<Quest>? quests})
+      : quests = quests ?? [];
+
+  int nextId;
+  String? lastReset; // 上次每日重置的日期（以凌晨 4 點為分界）
+  final List<Quest> quests;
+
+  int newId() => nextId++;
+
+  Map<String, dynamic> toJson() => {
+        'nextId': nextId,
+        'lastReset': lastReset,
+        'quests': quests.map((q) => q.toJson()).toList(),
+      };
+
+  factory AppData.fromJson(Map<String, dynamic> j) => AppData(
+        nextId: j['nextId'] as int,
+        lastReset: j['lastReset'] as String?,
+        quests: (j['quests'] as List)
+            .map((q) => Quest.fromJson(q as Map<String, dynamic>))
+            .toList(),
+      );
+
+  /// 第一次開啟時的範例資料。
+  factory AppData.sample() {
+    final d = AppData(nextId: 1);
+    final now = DateTime.now();
+    QuestStep step(String t, {String note = '', DateTime? deadline, bool done = false}) =>
+        QuestStep(id: d.newId(), title: t, note: note, deadline: deadline, done: done);
+
+    d.quests.addAll([
+      Quest(id: d.newId(), title: '每日委託', type: QuestType.daily, steps: [
+        step('喝水 2000cc'),
+        step('運動 30 分鐘'),
+      ]),
+      Quest(id: d.newId(), title: '踏上 Flutter 之旅', type: QuestType.main, steps: [
+        step('安裝開發環境', done: true),
+        step('做出第一個畫面',
+            note: '試著改改看 lib/ui/home_page.dart',
+            deadline: now.add(const Duration(days: 3))),
+      ]),
+      Quest(id: d.newId(), title: '整理房間', type: QuestType.side, steps: [
+        step('洗衣服', deadline: now.add(const Duration(hours: 20))),
+      ]),
+      Quest(id: d.newId(), title: '購物清單', type: QuestType.memo, steps: [
+        step('牛奶'),
+        step('電池'),
+      ]),
+    ]);
+    return d;
+  }
+}
+
+/// 每日重置以凌晨 4 點為分界（跟原神一樣）。
+String resetDayKey(DateTime now) {
+  final d = now.subtract(const Duration(hours: 4));
+  return '${d.year}-${d.month}-${d.day}';
+}
+
+/// 「剩 2 天 5 小時」、「無期限」、「已逾期」之類的文字。
+String deadlineText(QuestStep s, QuestType type, DateTime now) {
+  final d = s.deadline;
+  if (d == null) {
+    return type == QuestType.daily ? '每日 04:00 重置' : '無期限';
+  }
+  final diff = d.difference(now);
+  if (diff.isNegative) return '已逾期・${formatDateTime(d)}';
+  if (diff.inDays >= 1) return '剩 ${diff.inDays} 天 ${diff.inHours % 24} 小時';
+  if (diff.inHours >= 1) return '剩 ${diff.inHours} 小時 ${diff.inMinutes % 60} 分';
+  return '剩 ${diff.inMinutes} 分鐘';
+}
+
+String formatDateTime(DateTime d) {
+  String two(int n) => n.toString().padLeft(2, '0');
+  return '${d.month}/${d.day} ${two(d.hour)}:${two(d.minute)}';
+}

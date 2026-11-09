@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 通知圖示只在 Dart 程式碼裡用名字引用，告訴 release 編譯不要把它當成沒用到而刪掉 -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_stat_quest" />
