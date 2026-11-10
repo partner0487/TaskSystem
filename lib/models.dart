@@ -15,7 +15,7 @@ extension QuestTypeInfo on QuestType {
 
   IconData get icon => switch (this) {
         QuestType.main => Icons.auto_awesome,
-        QuestType.side => Icons.explore_outlined,
+        QuestType.side => Icons.new_releases_outlined, // 像原神突發任務的「!」
         QuestType.weekly => Icons.event_repeat,
         QuestType.daily => Icons.wb_sunny_outlined,
       };
