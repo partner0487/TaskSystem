@@ -239,7 +239,14 @@ class StepCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    Center(child: CheckButton(done: step.done, selected: selected, onTap: onToggle)),
+                    Center(
+                      child: CheckButton(
+                        done: step.done,
+                        selected: selected,
+                        locked: _resting,
+                        onTap: onToggle,
+                      ),
+                    ),
                     const SizedBox(width: 10),
                   ],
                 ),
@@ -254,15 +261,28 @@ class StepCard extends StatelessWidget {
 
 /// 右側的圓形勾選按鈕。
 class CheckButton extends StatelessWidget {
-  const CheckButton({super.key, required this.done, required this.selected, required this.onTap});
+  const CheckButton({
+    super.key,
+    required this.done,
+    required this.selected,
+    required this.onTap,
+    this.locked = false,
+  });
 
   final bool done;
   final bool selected;
   final VoidCallback onTap;
 
+  /// 還沒輪到的每週任務：按鈕變淡（點了只會顯示提示，不會打勾）
+  final bool locked;
+
   @override
   Widget build(BuildContext context) {
-    final ring = selected ? GColors.gold : GColors.gold.withValues(alpha: 0.55);
+    final ring = locked
+        ? GColors.sub.withValues(alpha: 0.35)
+        : selected
+            ? GColors.gold
+            : GColors.gold.withValues(alpha: 0.55);
     return InkResponse(
       onTap: onTap,
       radius: 26,
@@ -272,7 +292,9 @@ class CheckButton extends StatelessWidget {
         height: 38,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: done ? GColors.gold : Colors.black.withValues(alpha: 0.15),
+          color: done
+              ? (locked ? GColors.gold.withValues(alpha: 0.35) : GColors.gold)
+              : Colors.black.withValues(alpha: 0.15),
           border: Border.all(color: ring, width: 1.5),
         ),
         child: Icon(

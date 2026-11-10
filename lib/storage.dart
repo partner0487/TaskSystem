@@ -18,4 +18,10 @@ class Storage {
 
   static Future<void> write(AppData data) =>
       _prefs.setString(_key, jsonEncode(data.toJson()));
+
+  /// 「電池設定提示」使用者按過「不再提醒」。
+  static Future<bool> batteryTipDismissed() async =>
+      await _prefs.getBool('battery_tip_dismissed') ?? false;
+
+  static Future<void> dismissBatteryTip() => _prefs.setBool('battery_tip_dismissed', true);
 }

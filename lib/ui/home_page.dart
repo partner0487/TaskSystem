@@ -6,7 +6,10 @@ import 'package:flutter/material.dart';
 
 import '../backup.dart';
 import '../models.dart';
+import '../notifications.dart';
+import '../storage.dart';
 import '../store.dart';
+import '../system.dart';
 import '../theme.dart';
 import 'edit_sheets.dart';
 import 'widgets.dart';
@@ -27,12 +30,33 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   late final Timer _ticker;
   DateTime _now = DateTime.now();
 
+  // 手機設定檢查（頂端提示用）。預設 true = 檢查完之前不顯示提示
+  bool _notificationsOn = true;
+  bool _batteryOk = true;
+  bool _batteryTipDismissed = true;
+
   QuestStore get store => widget.store;
+
+  /// 檢查通知權限與電池設定；App 開啟、回到前景時都會做（從設定頁回來就會更新）。
+  Future<void> _checkSetup() async {
+    final results = await Future.wait([
+      Notifier.areEnabled(),
+      SystemInfo.isBatteryUnrestricted(),
+      Storage.batteryTipDismissed(),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _notificationsOn = results[0];
+      _batteryOk = results[1];
+      _batteryTipDismissed = results[2];
+    });
+  }
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _checkSetup();
     // 倒數文字的更新：有任務剩不到 1 小時（顯示到秒）就每秒重畫，
     // 否則每分鐘重畫一次就夠了（比較省電）。換分鐘時順便檢查是否跨過每日重置時間。
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -65,6 +89,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       _now = DateTime.now();
       store.reload();
+      _checkSetup();
     }
   }
 
@@ -97,7 +122,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _showUndo('已刪除「${s.title}」');
   }
 
-  Future<void> _toggleStep(QuestStep s) async {
+  Future<void> _toggleStep(Quest q, QuestStep s) async {
+    // 還沒輪到的每週任務不能打勾（例如週一的「週六日籃球」）
+    if (!isActiveOn(q.type, s, _now)) {
+      final next = nextResetFor(q.type, s, _now);
+      _toast(next == null
+          ? '「${s.title}」現在不能打勾'
+          : '「${s.title}」${nextResetLabel(next, _now)}才能打勾');
+      return;
+    }
     await store.toggleStep(s);
     if (s.done) _showUndo('已完成「${s.title}」');
   }
@@ -220,6 +253,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             child: Column(
               children: [
                 _buildTitle(),
+                _buildSetupBanner(),
                 _buildTabs(),
                 Expanded(child: store.loaded ? _buildList() : const SizedBox()),
               ],
@@ -245,7 +279,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, color: GColors.sub),
             color: GColors.card,
-            onSelected: (v) => v == 'export' ? _export() : _import(),
+            onSelected: (v) => switch (v) {
+              'export' => _export(),
+              'import' => _import(),
+              'battery' => SystemInfo.openAppSettings(),
+              _ => _showAbout(),
+            },
             itemBuilder: (_) => const [
               PopupMenuItem(
                 value: 'export',
@@ -255,8 +294,73 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 value: 'import',
                 child: ListTile(leading: Icon(Icons.download), title: Text('匯入備份')),
               ),
+              PopupMenuDivider(),
+              PopupMenuItem(
+                value: 'battery',
+                child: ListTile(leading: Icon(Icons.battery_charging_full), title: Text('背景執行設定')),
+              ),
+              PopupMenuItem(
+                value: 'about',
+                child: ListTile(leading: Icon(Icons.info_outline), title: Text('關於')),
+              ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+
+  /// 頂端的設定提示：通知沒開（最重要，不能關掉）> 電池有限制（可以「不再提醒」）。
+  Widget _buildSetupBanner() {
+    if (!_notificationsOn) {
+      return _Banner(
+        color: GColors.overdue,
+        icon: Icons.notifications_off_outlined,
+        text: '通知未開啟，任務不會出現在通知欄',
+        action: '開啟',
+        onAction: Notifier.openSettings,
+      );
+    }
+    if (!_batteryOk && !_batteryTipDismissed) {
+      return _Banner(
+        color: GColors.gold,
+        icon: Icons.battery_alert_outlined,
+        text: '建議把電池設為「不受限制」，通知欄的「完成」才能穩定運作\n（App 資訊 → 電池 → 不受限制）',
+        action: '前往設定',
+        onAction: SystemInfo.openAppSettings,
+        onClose: () async {
+          await Storage.dismissBatteryTip();
+          setState(() => _batteryTipDismissed = true);
+        },
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
+  Future<void> _showAbout() async {
+    final version = await SystemInfo.appVersion();
+    if (!mounted) return;
+    const repo = 'https://github.com/partner0487/TaskSystem';
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: GColors.header,
+        title: const Row(
+          children: [
+            DiamondIcon(size: 16, filled: true),
+            SizedBox(width: 10),
+            Text('任務系統'),
+          ],
+        ),
+        content: Text('版本 $version\n\n參考原神任務介面的待辦清單，\n未完成的任務會常駐在通知欄。',
+            style: const TextStyle(color: GColors.text, height: 1.5)),
+        actions: [
+          TextButton(
+            onPressed: () => SystemInfo.openUrl('$repo/releases'),
+            child: const Text('檢查更新'),
+          ),
+          TextButton(onPressed: () => SystemInfo.openUrl(repo), child: const Text('GitHub')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('關閉')),
         ],
       ),
     );
@@ -391,7 +495,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           onTap: () => setState(
                               () => _selectedStep = _selectedStep == s.id ? null : s.id),
                           onLongPress: () => _editStep(q, s),
-                          onToggle: () => _toggleStep(s),
+                          onToggle: () => _toggleStep(q, s),
                         ),
                       ),
                     AddStepButton(onTap: () => _addStep(q)),
@@ -400,5 +504,59 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
       ),
     ];
+  }
+}
+
+/// 頂端的提示條（通知沒開、電池有限制…）。
+class _Banner extends StatelessWidget {
+  const _Banner({
+    required this.color,
+    required this.icon,
+    required this.text,
+    required this.action,
+    required this.onAction,
+    this.onClose,
+  });
+
+  final Color color;
+  final IconData icon;
+  final String text;
+  final String action;
+  final Future<void> Function() onAction;
+
+  /// 有提供才顯示「×」（可以不再提醒）。
+  final Future<void> Function()? onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        border: Border.all(color: color.withValues(alpha: 0.6)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(text, style: const TextStyle(color: GColors.text, fontSize: 13)),
+          ),
+          TextButton(
+            onPressed: onAction,
+            style: TextButton.styleFrom(foregroundColor: color),
+            child: Text(action),
+          ),
+          if (onClose != null)
+            IconButton(
+              tooltip: '不再提醒',
+              visualDensity: VisualDensity.compact,
+              icon: const Icon(Icons.close, size: 18, color: GColors.sub),
+              onPressed: onClose,
+            ),
+        ],
+      ),
+    );
   }
 }

@@ -66,6 +66,12 @@ class Notifier {
     await _android?.requestNotificationsPermission();
   }
 
+  /// 使用者有沒有允許通知（拒絕的話，任務不會出現在通知欄）。
+  static Future<bool> areEnabled() async => await _android?.areNotificationsEnabled() ?? true;
+
+  /// 打開這個 App 的通知設定頁。
+  static Future<void> openSettings() async => _android?.openAppNotificationSettings();
+
   /// 通知欄的事件：
   /// - 按「✓ 完成」→ 把那個細項標成完成
   /// - 把通知滑掉 → 什麼都不改，重新同步時就會把它補回來（滑不掉的效果）
