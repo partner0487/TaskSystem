@@ -97,6 +97,46 @@ class QuestStore extends ChangeNotifier {
     return _commit();
   }
 
+  /// 拖曳排序大事件。[oldIndex] / [newIndex] 是在這個分頁畫面上的位置（[questsOf] 的順序）。
+  Future<void> reorderQuests(QuestType type, int oldIndex, int newIndex) {
+    final visible = questsOf(type);
+    final moved = visible.removeAt(oldIndex);
+    visible.insert(newIndex, moved);
+    // 其它分類的位置不動，只把這個分類的「格子」依新順序填回去
+    var i = 0;
+    for (var k = 0; k < quests.length; k++) {
+      if (quests[k].type == type) quests[k] = visible[i++];
+    }
+    return _commit();
+  }
+
+  /// 拖曳排序細項。[shown] 是畫面上的順序（[displaySteps]），index 是在它裡面的位置。
+  Future<void> reorderSteps(Quest q, List<QuestStep> shown, int oldIndex, int newIndex) {
+    final list = [...shown];
+    final moved = list.removeAt(oldIndex);
+    list.insert(newIndex, moved);
+    q.steps
+      ..clear()
+      ..addAll(list);
+    return _commit();
+  }
+
+  /// 清除主線 / 支線裡已完成的細項；整個做完的大事件一起刪掉（可以復原）。回傳清掉幾個細項。
+  Future<int> clearCompleted() async {
+    var count = 0;
+    final targets = quests.where((q) => !q.type.recurring).toList();
+    if (!targets.any((q) => q.steps.any((s) => s.done))) return 0;
+    _snapshot();
+    for (final q in targets) {
+      final hadSteps = q.steps.isNotEmpty;
+      count += q.steps.where((s) => s.done).length;
+      q.steps.removeWhere((s) => s.done);
+      if (hadSteps && q.steps.isEmpty) quests.remove(q);
+    }
+    await _commit();
+    return count;
+  }
+
   Future<void> deleteQuest(Quest q) {
     _snapshot();
     quests.remove(q);

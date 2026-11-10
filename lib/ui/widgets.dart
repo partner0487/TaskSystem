@@ -47,12 +47,16 @@ class QuestHeader extends StatelessWidget {
   const QuestHeader({
     super.key,
     required this.quest,
+    required this.progress,
     required this.expanded,
     required this.onTap,
     required this.onMenu,
   });
 
   final Quest quest;
+
+  /// 「1/2」、「休息中」、「已完成」（見 questProgress）
+  final String progress;
   final bool expanded;
   final VoidCallback onTap;
   final void Function(String action) onMenu;
@@ -92,7 +96,7 @@ class QuestHeader extends StatelessWidget {
               ),
             ),
             Text(
-              done ? '已完成' : '${quest.doneCount}/${quest.steps.length}',
+              progress,
               style: const TextStyle(color: GColors.sub, fontSize: 13),
             ),
             PopupMenuButton<String>(
@@ -121,7 +125,7 @@ class StepCard extends StatelessWidget {
     required this.selected,
     required this.now,
     required this.onTap,
-    required this.onLongPress,
+    required this.onEdit,
     required this.onToggle,
   });
 
@@ -130,11 +134,16 @@ class StepCard extends StatelessWidget {
   final bool selected;
   final DateTime now;
   final VoidCallback onTap;
-  final VoidCallback onLongPress;
+  final VoidCallback onEdit;
   final VoidCallback onToggle;
 
   /// 今天不是它的日子（例如週一的「週六日籃球」）
   bool get _resting => !isActiveOn(type, step, now);
+
+  /// 有設震動提醒（主線 / 支線要有期限才算；每週用自動期限）
+  bool get _hasReminder =>
+      step.remindBefore != null &&
+      (type == QuestType.weekly || !type.recurring && step.deadline != null);
 
   /// 已完成：什麼時候重新出現；每週任務休息中：哪天出現；其它：期限。
   String _subtitle() {
@@ -177,7 +186,6 @@ class StepCard extends StatelessWidget {
         Expanded(
           child: GestureDetector(
             onTap: onTap,
-            onLongPress: onLongPress,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
               margin: const EdgeInsets.symmetric(vertical: 4),
@@ -222,7 +230,7 @@ class StepCard extends StatelessWidget {
                                     style: TextStyle(color: subColor, fontSize: 13),
                                   ),
                                 ),
-                                if (!step.done && !type.recurring && step.remindAt != null) ...[
+                                if (!step.done && _hasReminder) ...[
                                   const SizedBox(width: 6),
                                   Icon(Icons.vibration, size: 14, color: subColor),
                                 ],
@@ -235,6 +243,21 @@ class StepCard extends StatelessWidget {
                                 style: const TextStyle(color: GColors.textDark, fontSize: 14),
                               ),
                             ],
+                            // 選中時才出現的「編輯」（長按是拖曳排序）
+                            if (selected)
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: TextButton.icon(
+                                  onPressed: onEdit,
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: GColors.textDark,
+                                    padding: EdgeInsets.zero,
+                                    visualDensity: VisualDensity.compact,
+                                  ),
+                                  icon: const Icon(Icons.edit_outlined, size: 16),
+                                  label: const Text('編輯'),
+                                ),
+                              ),
                           ],
                         ),
                       ),

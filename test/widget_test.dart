@@ -82,12 +82,54 @@ void main() {
             steps: [QuestStep(id: 2, title: '運動', done: true, weekdays: days)]),
       ]);
 
-  test('每週一三五：週二早上不重置，週三早上重置', () {
+  test('每週一三五：週一做完，週二顯示未完成但還沒輪到、週三再出現', () {
     const mwf = [DateTime.monday, DateTime.wednesday, DateTime.friday];
     final tue = weekly('2026-11-9', days: mwf)..applyResets(DateTime(2026, 11, 10, 8));
-    expect(tue.quests[0].steps[0].done, isTrue);
-    final wed = weekly('2026-11-10', days: mwf)..applyResets(DateTime(2026, 11, 11, 8));
-    expect(wed.quests[0].steps[0].done, isFalse);
+    final step = tue.quests[0].steps[0];
+    expect(step.done, isFalse); // 週二早上：變回未完成
+    expect(isActiveOn(QuestType.weekly, step, DateTime(2026, 11, 10, 8)), isFalse); // 但還沒輪到（不能打勾）
+    expect(questProgress(QuestType.weekly, tue.quests[0], DateTime(2026, 11, 10, 8)), '休息中');
+    expect(isActiveOn(QuestType.weekly, step, DateTime(2026, 11, 11, 8)), isTrue); // 週三出現
+  });
+
+  test('標題進度只算現在該做的細項', () {
+    const sat = [DateTime.saturday];
+    final q = Quest(id: 1, title: '運動', type: QuestType.weekly, steps: [
+      QuestStep(id: 2, title: '跑步', done: true), // 沒選星期幾：整週都在
+      QuestStep(id: 3, title: '籃球', weekdays: sat), // 週六才輪到
+    ]);
+    expect(questProgress(QuestType.weekly, q, DateTime(2026, 11, 10, 12)), '1/1');
+    expect(questProgress(QuestType.weekly, q, DateTime(2026, 11, 14, 12)), '1/2');
+  });
+
+  test('細項顯示順序：要做的 → 還沒輪到的 → 已完成', () {
+    final steps = [
+      QuestStep(id: 1, title: '完成的', done: true),
+      QuestStep(id: 2, title: '週六的', weekdays: const [DateTime.saturday]),
+      QuestStep(id: 3, title: '今天的'),
+    ];
+    final order = displaySteps(QuestType.weekly, steps, DateTime(2026, 11, 10, 12)).map((s) => s.id);
+    expect(order, [3, 2, 1]);
+  });
+
+  test('每週任務的震動提醒', () {
+    final ball = QuestStep(
+        id: 1, title: '籃球', weekdays: const [DateTime.saturday], remindBefore: 120);
+    // 週二：提醒排在週六晚上 10 點（24:00 前 2 小時）
+    expect(nextReminderTime(QuestType.weekly, ball, DateTime(2026, 11, 10, 12)),
+        DateTime(2026, 11, 14, 22));
+    // 週六晚上 11 點、還沒做：今天的提醒已經過了 → 排下週六
+    expect(nextReminderTime(QuestType.weekly, ball, DateTime(2026, 11, 14, 23)),
+        DateTime(2026, 11, 21, 22));
+    // 週六下午做完 → 也是排下週六
+    ball.done = true;
+    expect(nextReminderTime(QuestType.weekly, ball, DateTime(2026, 11, 14, 15)),
+        DateTime(2026, 11, 21, 22));
+    // 每日委託不提醒；主線已完成不提醒
+    expect(nextReminderTime(QuestType.daily, ball, DateTime(2026, 11, 10)), isNull);
+    final report = QuestStep(
+        id: 2, title: '報告', deadline: DateTime(2026, 11, 12, 18), remindBefore: 60, done: true);
+    expect(nextReminderTime(QuestType.main, report, DateTime(2026, 11, 10)), isNull);
   });
 
   test('好幾天沒開 App，中間經過了重置日也會重置', () {

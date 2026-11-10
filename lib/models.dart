@@ -131,8 +131,10 @@ class AppData {
 
   int newId() => nextId++;
 
-  /// 跨過凌晨 4 點時重置：每日委託全部改回未完成；
-  /// 每週任務只有「經過了它的重置日」才改回未完成。有變動時回傳 true。
+  /// 跨過凌晨 4 點時重置。有變動時回傳 true。
+  /// - 每日委託、有選星期幾的每週任務：每天都改回未完成
+  ///   （例如一三五的任務週一做完，週二會顯示「未完成、還沒輪到」，週三再出現）
+  /// - 沒選星期幾的每週任務：經過週一才改回未完成（一週做一次）
   /// App 畫面、通知欄的背景處理、開機補發都會呼叫，所以放在資料層。
   bool applyResets(DateTime now) {
     final today = gameDay(now);
@@ -150,7 +152,9 @@ class AppData {
       }
       for (final q in quests) {
         for (final s in q.steps) {
-          if (q.type == QuestType.daily && passed.isNotEmpty ||
+          final perDay = q.type == QuestType.daily ||
+              q.type == QuestType.weekly && s.weekdays.isNotEmpty;
+          if (perDay && passed.isNotEmpty ||
               q.type == QuestType.weekly && s.resetWeekdays.any(passed.contains)) {
             s.done = false;
           }
@@ -245,6 +249,54 @@ bool isActiveOn(QuestType type, QuestStep s, DateTime now) {
   if (s.weekdays.isNotEmpty && !s.weekdays.contains(gameDay(now).weekday)) return false;
   final d = effectiveDeadline(type, s, now);
   return d == null || now.isBefore(d);
+}
+
+/// 細項的顯示順序：今天要做的 → 還沒輪到的（每週任務的休息日）→ 已完成。
+/// 同一組裡維持使用者排好的順序。
+List<QuestStep> displaySteps(QuestType type, List<QuestStep> steps, DateTime now) {
+  bool active(QuestStep s) => isActiveOn(type, s, now);
+  return [
+    ...steps.where((s) => !s.done && active(s)),
+    ...steps.where((s) => !s.done && !active(s)),
+    ...steps.where((s) => s.done),
+  ];
+}
+
+/// 大事件標題右邊的進度，只算「現在該做的」細項：「1/2」；全部都還沒輪到就是「休息中」。
+String questProgress(QuestType type, Quest q, DateTime now) {
+  if (q.done) return '已完成';
+  final active = q.steps.where((s) => isActiveOn(type, s, now)).toList();
+  if (q.steps.isNotEmpty && active.isEmpty) return '休息中';
+  return '${active.where((s) => s.done).length}/${active.length}';
+}
+
+/// 下一次震動提醒的時間（沒有就回傳 null）：
+/// - 主線 / 支線：截止時間往前推（已完成就不提醒）
+/// - 每週任務：當次的截止時間（當天 / 週日 24:00）往前推；
+///   當次已完成或提醒時間已過，就算下一次出現的那天
+/// - 每日委託：不提醒
+DateTime? nextReminderTime(QuestType type, QuestStep s, DateTime now) {
+  final m = s.remindBefore;
+  if (m == null) return null;
+  if (!type.recurring) {
+    final at = s.remindAt;
+    return !s.done && at != null && at.isAfter(now) ? at : null;
+  }
+  if (type != QuestType.weekly) return null;
+
+  DateTime? remindFor(DateTime when) =>
+      effectiveDeadline(type, s, when)?.subtract(Duration(minutes: m));
+
+  // 這一次（今天輪到、還沒做）
+  if (!s.done && isActiveOn(type, s, now)) {
+    final at = remindFor(now);
+    if (at != null && at.isAfter(now)) return at;
+  }
+  // 下一次出現的那天
+  final next = nextResetFor(type, s, now);
+  if (next == null) return null;
+  final at = remindFor(next);
+  return at != null && at.isAfter(now) ? at : null;
 }
 
 /// 主線 / 支線逾期多久後從通知欄移除（App 裡仍保留）。

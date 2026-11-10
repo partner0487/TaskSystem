@@ -123,14 +123,12 @@ class Notifier {
 
     for (final q in data.quests) {
       for (final s in q.steps) {
-        // 到期提醒（只有主線 / 支線有手動期限）：只要還沒完成就照常提醒
-        if (!s.done && !q.type.recurring) {
-          keepActive.add(_reminderIdOffset + s.id); // 已經跳出的提醒留著，等使用者自己處理
-          final at = s.remindAt;
-          if (at != null && at.isAfter(now)) {
-            keepPending.add(_reminderIdOffset + s.id);
-            reminders.add((q, s, at));
-          }
+        // 到期前的震動提醒（主線 / 支線 / 每週）
+        if (!s.done) keepActive.add(_reminderIdOffset + s.id); // 已經跳出的提醒留著，等使用者自己處理
+        final remindAt = nextReminderTime(q.type, s, now);
+        if (remindAt != null) {
+          keepPending.add(_reminderIdOffset + s.id);
+          reminders.add((q, s, remindAt));
         }
 
         // 逾期超過 7 天的主線 / 支線不再放通知欄（App 裡還看得到）

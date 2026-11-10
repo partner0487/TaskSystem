@@ -117,6 +117,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
   }
 
+  /// 清除主線 / 支線裡已完成的細項（每日 / 每週會自己重置，不清）。
+  Future<void> _clearCompleted() async {
+    final n = await store.clearCompleted();
+    if (n == 0) {
+      _toast('主線／支線沒有已完成的任務');
+    } else {
+      _showUndo('已清除 $n 個已完成的細項');
+    }
+  }
+
   Future<void> _deleteStep(Quest q, QuestStep s) async {
     await store.deleteStep(q, s);
     _showUndo('已刪除「${s.title}」');
@@ -283,6 +293,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               'export' => _export(),
               'import' => _import(),
               'battery' => SystemInfo.openAppSettings(),
+              'clear' => _clearCompleted(),
               _ => _showAbout(),
             },
             itemBuilder: (_) => const [
@@ -293,6 +304,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               PopupMenuItem(
                 value: 'import',
                 child: ListTile(leading: Icon(Icons.download), title: Text('匯入備份')),
+              ),
+              PopupMenuItem(
+                value: 'clear',
+                child: ListTile(leading: Icon(Icons.cleaning_services_outlined), title: Text('清除已完成')),
               ),
               PopupMenuDivider(),
               PopupMenuItem(
@@ -430,15 +445,29 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         ),
       );
     }
-    return ListView(
+    // 長按大事件標題可以拖曳排序
+    return ReorderableListView.builder(
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 96),
-      children: [
-        for (final q in quests) ..._buildQuest(q),
-      ],
+      buildDefaultDragHandles: false,
+      proxyDecorator: _dragProxy,
+      itemCount: quests.length,
+      onReorderItem: (from, to) => store.reorderQuests(_tab, from, to),
+      itemBuilder: (context, i) => KeyedSubtree(
+        key: ValueKey('quest-${quests[i].id}'),
+        child: _buildQuest(quests[i], i),
+      ),
     );
   }
 
-  List<Widget> _buildQuest(Quest q) {
+  /// 拖曳中的項目：浮起來加陰影。
+  Widget _dragProxy(Widget child, int index, Animation<double> animation) => Material(
+        color: Colors.transparent,
+        elevation: 8,
+        shadowColor: Colors.black,
+        child: child,
+      );
+
+  Widget _buildQuest(Quest q, int index) {
     // 已完成的大事件預設收合
     final expanded = q.done ? _collapsed.contains(-q.id) : !_collapsed.contains(q.id);
     void toggle() => setState(() {
@@ -446,64 +475,79 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           _collapsed.contains(key) ? _collapsed.remove(key) : _collapsed.add(key);
         });
 
-    // 排序：今天要做的 → 今天休息的（每週任務的非指定日）→ 已完成
-    bool active(QuestStep s) => isActiveOn(q.type, s, _now);
-    final steps = [
-      ...q.steps.where((s) => !s.done && active(s)),
-      ...q.steps.where((s) => !s.done && !active(s)),
-      ...q.steps.where((s) => s.done),
-    ];
+    final steps = displaySteps(q.type, q.steps, _now);
 
-    return [
-      Padding(
-        padding: const EdgeInsets.only(top: 10),
-        child: QuestHeader(
-          quest: q,
-          expanded: expanded,
-          onTap: toggle,
-          onMenu: (a) => _questMenu(q, a),
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 10),
+          child: ReorderableDelayedDragStartListener(
+            index: index,
+            child: QuestHeader(
+              quest: q,
+              progress: questProgress(q.type, q, _now),
+              expanded: expanded,
+              onTap: toggle,
+              onMenu: (a) => _questMenu(q, a),
+            ),
+          ),
         ),
-      ),
-      AnimatedSize(
-        duration: const Duration(milliseconds: 200),
-        alignment: Alignment.topCenter,
-        child: !expanded
-            ? const SizedBox(width: double.infinity)
-            : Container(
-                margin: const EdgeInsets.only(left: 10, right: 2),
-                padding: const EdgeInsets.fromLTRB(0, 6, 8, 6),
-                color: Colors.white.withValues(alpha: 0.05),
-                child: Column(
-                  children: [
-                    for (final s in steps)
-                      Dismissible(
-                        key: ValueKey(s.id),
-                        direction: DismissDirection.endToStart,
-                        background: Container(
-                          alignment: Alignment.centerRight,
-                          padding: const EdgeInsets.only(right: 24),
-                          color: GColors.overdue.withValues(alpha: 0.6),
-                          child: const Icon(Icons.delete_outline),
-                        ),
-                        // 不用確認視窗：刪除後下方會出現「復原」
-                        onDismissed: (_) => _deleteStep(q, s),
-                        child: StepCard(
-                          step: s,
-                          type: q.type,
-                          now: _now,
-                          selected: _selectedStep == s.id,
-                          onTap: () => setState(
-                              () => _selectedStep = _selectedStep == s.id ? null : s.id),
-                          onLongPress: () => _editStep(q, s),
-                          onToggle: () => _toggleStep(q, s),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 200),
+          alignment: Alignment.topCenter,
+          child: !expanded
+              ? const SizedBox(width: double.infinity)
+              : Container(
+                  margin: const EdgeInsets.only(left: 10, right: 2),
+                  padding: const EdgeInsets.fromLTRB(0, 6, 8, 6),
+                  color: Colors.white.withValues(alpha: 0.05),
+                  child: Column(
+                    children: [
+                      // 長按細項可以在大事件裡拖曳排序
+                      ReorderableListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        buildDefaultDragHandles: false,
+                        proxyDecorator: _dragProxy,
+                        itemCount: steps.length,
+                        onReorderItem: (from, to) => store.reorderSteps(q, steps, from, to),
+                        itemBuilder: (context, j) => ReorderableDelayedDragStartListener(
+                          key: ValueKey('step-${steps[j].id}'),
+                          index: j,
+                          child: _buildStep(q, steps[j]),
                         ),
                       ),
-                    AddStepButton(onTap: () => _addStep(q)),
-                  ],
+                      AddStepButton(onTap: () => _addStep(q)),
+                    ],
+                  ),
                 ),
-              ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStep(Quest q, QuestStep s) {
+    return Dismissible(
+      key: ValueKey(s.id),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 24),
+        color: GColors.overdue.withValues(alpha: 0.6),
+        child: const Icon(Icons.delete_outline),
       ),
-    ];
+      // 不用確認視窗：刪除後下方會出現「復原」
+      onDismissed: (_) => _deleteStep(q, s),
+      child: StepCard(
+        step: s,
+        type: q.type,
+        now: _now,
+        selected: _selectedStep == s.id,
+        onTap: () => setState(() => _selectedStep = _selectedStep == s.id ? null : s.id),
+        onEdit: () => _editStep(q, s),
+        onToggle: () => _toggleStep(q, s),
+      ),
+    );
   }
 }
 

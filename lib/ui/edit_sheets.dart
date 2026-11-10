@@ -145,8 +145,10 @@ class _StepFormState extends State<_StepForm> {
   late final _note = TextEditingController(text: widget.step?.note ?? '');
   late DateTime? _deadline = widget.step?.deadline;
   late final Set<int> _weekdays = {...?widget.step?.weekdays};
-  // 新的細項預設「1 小時前」震動提醒
-  late int? _remind = widget.step == null ? 60 : widget.step!.remindBefore;
+  // 新的主線 / 支線細項預設「1 小時前」震動提醒；每週任務預設不提醒
+  late int? _remind = widget.step != null
+      ? widget.step!.remindBefore
+      : (widget.type.recurring ? null : 60);
 
   @override
   void dispose() {
@@ -184,7 +186,8 @@ class _StepFormState extends State<_StepForm> {
       // 每日 / 每週不使用手動期限，存檔時清掉，避免日後改分類時冒出舊期限
       deadline: recurring ? null : _deadline,
       weekdays: _weekdays.toList()..sort(),
-      remindBefore: recurring ? null : _remind,
+      // 每日委託沒有期限，不提醒；每週任務可以
+      remindBefore: widget.type == QuestType.daily ? null : _remind,
     ));
   }
 
@@ -255,14 +258,19 @@ class _StepFormState extends State<_StepForm> {
             },
           ),
         ],
-        if (!widget.type.recurring && _deadline != null) ...[
+        if (!widget.type.recurring && _deadline != null)
           TextButton.icon(
             onPressed: _pickDeadline,
             icon: const Icon(Icons.edit_calendar),
             label: const Text('更改期限'),
           ),
-          const SizedBox(height: 4),
-          const Text('震動提醒（不響鈴）', style: TextStyle(color: GColors.sub)),
+        // 震動提醒：主線 / 支線要先設期限；每週任務用自動期限（當天 / 週日 24:00）
+        if (!widget.type.recurring && _deadline != null || widget.type == QuestType.weekly) ...[
+          const SizedBox(height: 8),
+          Text(
+            widget.type == QuestType.weekly ? '震動提醒（截止 24:00 前，不響鈴）' : '震動提醒（不響鈴）',
+            style: const TextStyle(color: GColors.sub),
+          ),
           const SizedBox(height: 6),
           Wrap(
             spacing: 6,
