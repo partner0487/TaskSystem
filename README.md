@@ -31,6 +31,10 @@
 展開通知就能直接按 **「✓ 完成」**，不用打開 App。
 不小心滑掉了？它會自己回來。重開機後也會自動補回。
 
+<p align="center">
+  <img src="docs/screenshots/notifications.png" width="360" alt="通知欄">
+</p>
+
 ### 🗂️ 四種任務，大事件底下再分細項
 | 分類 | 適合 | 規則 |
 |---|---|---|
