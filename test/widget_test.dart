@@ -63,7 +63,7 @@ void main() {
     expect(nextResetTime(DateTime(2026, 11, 30, 23, 0)), DateTime(2026, 12, 1, 4));
   });
 
-  test('跨過 4 點時，每日委託變回未完成，其它分類不受影響', () {
+  test('跨過 4 點時，每日任務變回未完成，其它分類不受影響', () {
     final data = AppData(nextId: 10, lastReset: '2026-11-8', quests: [
       Quest(id: 1, title: '每日', type: QuestType.daily,
           steps: [QuestStep(id: 2, title: '喝水', done: true)]),
@@ -125,7 +125,7 @@ void main() {
     ball.done = true;
     expect(nextReminderTime(QuestType.weekly, ball, DateTime(2026, 11, 14, 15)),
         DateTime(2026, 11, 21, 22));
-    // 每日委託不提醒；主線已完成不提醒
+    // 每日任務不提醒；主線已完成不提醒
     expect(nextReminderTime(QuestType.daily, ball, DateTime(2026, 11, 10)), isNull);
     final report = QuestStep(
         id: 2, title: '報告', deadline: DateTime(2026, 11, 12, 18), remindBefore: 60, done: true);

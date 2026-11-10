@@ -51,7 +51,7 @@ AppData demoData() {
       step('打掃房間'),
       step('籃球', weekdays: [DateTime.saturday, DateTime.sunday]),
     ]),
-    Quest(id: d.newId(), title: '每日委託', type: QuestType.daily, steps: [
+    Quest(id: d.newId(), title: '每日任務', type: QuestType.daily, steps: [
       step('喝水 2000cc'),
       step('整理桌面'),
       step('背 20 個英文單字', done: true),

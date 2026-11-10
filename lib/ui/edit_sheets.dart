@@ -186,7 +186,7 @@ class _StepFormState extends State<_StepForm> {
       // 每日 / 每週不使用手動期限，存檔時清掉，避免日後改分類時冒出舊期限
       deadline: recurring ? null : _deadline,
       weekdays: _weekdays.toList()..sort(),
-      // 每日委託沒有期限，不提醒；每週任務可以
+      // 每日任務沒有期限，不提醒；每週任務可以
       remindBefore: widget.type == QuestType.daily ? null : _remind,
     ));
   }

@@ -16,7 +16,7 @@ const _channelName = '待辦任務';
 const _actionComplete = 'complete';
 const _uiPortName = 'quest_ui_port';
 
-/// 每日委託「凌晨 4 點重新出現」的預約通知，id 用 細項 id + 這個偏移量，
+/// 每日任務「凌晨 4 點重新出現」的預約通知，id 用 細項 id + 這個偏移量，
 /// 才不會跟正在顯示的通知（id = 細項 id）互相取消。
 const _resetIdOffset = 1000000;
 

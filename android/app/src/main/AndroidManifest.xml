@@ -39,7 +39,7 @@
         <receiver
             android:exported="false"
             android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver" />
-        <!-- 預約通知（每日委託凌晨 4 點重新出現）到時間時由它發出 -->
+        <!-- 預約通知（每日任務凌晨 4 點重新出現）到時間時由它發出 -->
         <receiver
             android:exported="false"
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />

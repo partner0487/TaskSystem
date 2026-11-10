@@ -10,7 +10,7 @@ extension QuestTypeInfo on QuestType {
         QuestType.main => '主線任務',
         QuestType.side => '支線任務',
         QuestType.weekly => '每週任務',
-        QuestType.daily => '每日委託',
+        QuestType.daily => '每日任務',
       };
 
   IconData get icon => switch (this) {
@@ -132,7 +132,7 @@ class AppData {
   int newId() => nextId++;
 
   /// 跨過凌晨 4 點時重置。有變動時回傳 true。
-  /// - 每日委託、有選星期幾的每週任務：每天都改回未完成
+  /// - 每日任務、有選星期幾的每週任務：每天都改回未完成
   ///   （例如一三五的任務週一做完，週二會顯示「未完成、還沒輪到」，週三再出現）
   /// - 沒選星期幾的每週任務：經過週一才改回未完成（一週做一次）
   /// App 畫面、通知欄的背景處理、開機補發都會呼叫，所以放在資料層。
@@ -209,8 +209,8 @@ class AppData {
             note: '每週任務可以選星期幾，只在那幾天出現。',
             weekdays: [DateTime.monday, DateTime.wednesday, DateTime.friday]),
       ]),
-      Quest(id: d.newId(), title: '每日委託', type: QuestType.daily, steps: [
-        step('喝水 2000cc', note: '每日委託每天凌晨 4 點重新出現。'),
+      Quest(id: d.newId(), title: '每日任務', type: QuestType.daily, steps: [
+        step('喝水 2000cc', note: '每日任務每天凌晨 4 點重新出現。'),
       ]),
     ]);
     return d;
@@ -274,7 +274,7 @@ String questProgress(QuestType type, Quest q, DateTime now) {
 /// - 主線 / 支線：截止時間往前推（已完成就不提醒）
 /// - 每週任務：當次的截止時間（當天 / 週日 24:00）往前推；
 ///   當次已完成或提醒時間已過，就算下一次出現的那天
-/// - 每日委託：不提醒
+/// - 每日任務：不提醒
 DateTime? nextReminderTime(QuestType type, QuestStep s, DateTime now) {
   final m = s.remindBefore;
   if (m == null) return null;
