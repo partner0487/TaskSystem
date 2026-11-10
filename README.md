@@ -15,11 +15,13 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/main.png" width="180" alt="主線任務">
-  <img src="docs/screenshots/side.png" width="180" alt="支線任務">
-  <img src="docs/screenshots/weekly.png" width="180" alt="每週任務">
-  <img src="docs/screenshots/daily.png" width="180" alt="每日任務">
-  <img src="docs/screenshots/edit.png" width="180" alt="設定每天固定時間">
+  <img src="docs/screenshots/main.png" width="220" alt="主線任務">
+  <img src="docs/screenshots/side.png" width="220" alt="支線任務">
+  <img src="docs/screenshots/weekly.png" width="220" alt="每週任務">
+</p>
+<p align="center">
+  <img src="docs/screenshots/daily.png" width="220" alt="每日任務">
+  <img src="docs/screenshots/edit.png" width="220" alt="設定每天固定時間">
 </p>
 
 ---
