@@ -39,6 +39,7 @@ class QuestStep {
     this.done = false,
     List<int>? weekdays,
     this.remindBefore,
+    this.timeOfDay,
   }) : weekdays = weekdays ?? [];
 
   final int id;
@@ -51,7 +52,12 @@ class QuestStep {
   List<int> weekdays;
 
   /// 截止前幾分鐘震動提醒，null = 不提醒。只有設定期限時才有作用。
+  /// 有時間的每日任務：時間前幾分鐘提醒（0 = 準時）。
   int? remindBefore;
+
+  /// 每日任務「每天幾點」（從午夜起算的分鐘數，例如 18:00 = 1080），null = 沒有指定時間。
+  /// 有指定時間的每日任務，時間到才出現在通知欄（例如「晚餐後吃藥 18:00」）。
+  int? timeOfDay;
 
   /// 每週任務實際的重置日。
   List<int> get resetWeekdays => weekdays.isEmpty ? const [DateTime.monday] : weekdays;
@@ -71,6 +77,7 @@ class QuestStep {
         'done': done,
         'weekdays': weekdays,
         'remindBefore': remindBefore,
+        'timeOfDay': timeOfDay,
       };
 
   factory QuestStep.fromJson(Map<String, dynamic> j) => QuestStep(
@@ -83,6 +90,7 @@ class QuestStep {
         done: (j['done'] as bool?) ?? false,
         weekdays: ((j['weekdays'] as List?) ?? const []).cast<int>().toList(),
         remindBefore: j['remindBefore'] as int?,
+        timeOfDay: j['timeOfDay'] as int?,
       );
 }
 
@@ -274,7 +282,8 @@ String questProgress(QuestType type, Quest q, DateTime now) {
 /// - 主線 / 支線：截止時間往前推（已完成就不提醒）
 /// - 每週任務：當次的截止時間（當天 / 週日 24:00）往前推；
 ///   當次已完成或提醒時間已過，就算下一次出現的那天
-/// - 每日任務：不提醒
+/// - 有時間的每日任務：時間往前推（0 = 準時）；今天已完成或已過，就算明天
+/// - 沒有時間的每日任務：不提醒
 DateTime? nextReminderTime(QuestType type, QuestStep s, DateTime now) {
   final m = s.remindBefore;
   if (m == null) return null;
@@ -282,7 +291,14 @@ DateTime? nextReminderTime(QuestType type, QuestStep s, DateTime now) {
     final at = s.remindAt;
     return !s.done && at != null && at.isAfter(now) ? at : null;
   }
-  if (type != QuestType.weekly) return null;
+  if (type == QuestType.daily) {
+    if (s.timeOfDay == null) return null;
+    final day = gameDay(now);
+    final today = dailyTimeOn(s, day)!.subtract(Duration(minutes: m));
+    if (!s.done && today.isAfter(now)) return today;
+    return dailyTimeOn(s, DateTime(day.year, day.month, day.day + 1))!
+        .subtract(Duration(minutes: m));
+  }
 
   DateTime? remindFor(DateTime when) =>
       effectiveDeadline(type, s, when)?.subtract(Duration(minutes: m));
@@ -315,12 +331,41 @@ bool isStale(QuestType type, QuestStep s, DateTime now) {
   return t != null && !now.isBefore(t);
 }
 
+/// 「18:00」
+String timeText(int minutes) =>
+    '${(minutes ~/ 60).toString().padLeft(2, '0')}:${(minutes % 60).toString().padLeft(2, '0')}';
+
+/// 有時間的每日任務，在某個「任務日」（[gameDay] 的日期）的時間點。
+/// 凌晨 4 點前的時間（例如 01:00 睡前吃藥）屬於這個任務日的隔天凌晨。
+DateTime? dailyTimeOn(QuestStep s, DateTime day) {
+  final t = s.timeOfDay;
+  if (t == null) return null;
+  return DateTime(day.year, day.month, day.day + (t < 4 * 60 ? 1 : 0), t ~/ 60, t % 60);
+}
+
+/// 有時間的每日任務，今天的時間還沒到（還沒出現在通知欄，但可以提早打勾）。
+bool beforeDailyTime(QuestType type, QuestStep s, DateTime now) {
+  if (type != QuestType.daily) return false;
+  final t = dailyTimeOn(s, gameDay(now));
+  return t != null && now.isBefore(t);
+}
+
+/// 畫面倒數的目標時間：期限（主線 / 支線 / 每週），或有時間的每日任務還沒到的那個時間。
+DateTime? countdownTarget(QuestType type, QuestStep s, DateTime now) =>
+    effectiveDeadline(type, s, now) ??
+    (beforeDailyTime(type, s, now) ? dailyTimeOn(s, gameDay(now)) : null);
+
 /// 這個細項下一次被重置（重新出現）的時間；主線 / 支線不會重置，回傳 null。
+/// 有時間的每日任務：下一次「時間到」的時候（今天還沒做、時間還沒到 → 今天；否則 → 明天）。
 DateTime? nextResetFor(QuestType type, QuestStep s, DateTime now) {
   final first = nextResetTime(now);
   switch (type) {
     case QuestType.daily:
-      return first;
+      if (s.timeOfDay == null) return first;
+      final day = gameDay(now);
+      final today = dailyTimeOn(s, day)!;
+      if (!s.done && today.isAfter(now)) return today;
+      return dailyTimeOn(s, DateTime(day.year, day.month, day.day + 1));
     case QuestType.weekly:
       for (var i = 0; i < 7; i++) {
         final t = DateTime(first.year, first.month, first.day + i, 4);
@@ -347,13 +392,14 @@ String weekdaysText(QuestStep s) =>
 
 /// 沒設期限時顯示的文字。
 String _noDeadlineText(QuestStep s, QuestType type) => switch (type) {
-      QuestType.daily => '每日 04:00 重置',
+      QuestType.daily => s.timeOfDay == null ? '每日 04:00 重置' : '每天 ${timeText(s.timeOfDay!)}',
       QuestType.weekly => s.weekdays.isEmpty ? '每週一 04:00 重置' : weekdaysText(s),
       _ => '無期限',
     };
 
 /// 「1 小時」、「10 分鐘」、「1 天」
 String durationText(int minutes) {
+  if (minutes == 0) return '0 分鐘';
   if (minutes % 1440 == 0) return '${minutes ~/ 1440} 天';
   if (minutes % 60 == 0) return '${minutes ~/ 60} 小時';
   return '$minutes 分鐘';
@@ -361,6 +407,21 @@ String durationText(int minutes) {
 
 /// 震動提醒的選項（分鐘），null = 不提醒。
 const remindOptions = <int?>[null, 10, 60, 1440];
+
+/// 有時間的每日任務的提醒選項：0 = 準時。
+const dailyRemindOptions = <int?>[null, 0, 10, 30];
+
+/// 提醒選項的文字：「準時」、「10 分鐘前」、「不提醒」
+String remindOptionText(int? m) => m == null ? '不提醒' : (m == 0 ? '準時' : '${durationText(m)}前');
+
+/// 震動提醒通知的標題。
+String reminderTitle(QuestType type, QuestStep s) {
+  final m = s.remindBefore ?? 0;
+  if (type == QuestType.daily) {
+    return m == 0 ? '時間到：${s.title}' : '${durationText(m)}後：${s.title}';
+  }
+  return '${durationText(m)}後到期：${s.title}';
+}
 
 /// 通知欄用的期限文字。通知發出後 App 不一定會再更新它，
 /// 所以用固定的截止時間（「截止 11/12（三）18:00」），不用會過時的「剩幾小時」。

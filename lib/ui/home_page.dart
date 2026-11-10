@@ -72,7 +72,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   /// 目前有沒有任務剩不到 1 小時（倒數會顯示秒數）。
   bool _showsSeconds(DateTime now) => store.quests.any((q) => q.steps.any((s) {
         if (s.done) return false;
-        final d = effectiveDeadline(q.type, s, now);
+        final d = countdownTarget(q.type, s, now);
         if (d == null) return false;
         final left = d.difference(now);
         return left > const Duration(seconds: -1) && left < const Duration(hours: 1);
@@ -224,7 +224,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         note: r.note,
         deadline: r.deadline,
         weekdays: r.weekdays,
-        remindBefore: r.remindBefore);
+        remindBefore: r.remindBefore,
+        timeOfDay: r.timeOfDay);
     _collapsed.remove(q.id);
   }
 
@@ -236,7 +237,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         note: r.note,
         deadline: r.deadline,
         weekdays: r.weekdays,
-        remindBefore: r.remindBefore);
+        remindBefore: r.remindBefore,
+        timeOfDay: r.timeOfDay);
   }
 
   // ---------- 畫面 ----------

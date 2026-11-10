@@ -150,14 +150,16 @@ class QuestStore extends ChangeNotifier {
       String note = '',
       DateTime? deadline,
       List<int>? weekdays,
-      int? remindBefore}) {
+      int? remindBefore,
+      int? timeOfDay}) {
     q.steps.add(QuestStep(
         id: _data.newId(),
         title: title,
         note: note,
         deadline: deadline,
         weekdays: weekdays,
-        remindBefore: remindBefore));
+        remindBefore: remindBefore,
+        timeOfDay: timeOfDay));
     return _commit();
   }
 
@@ -166,13 +168,15 @@ class QuestStore extends ChangeNotifier {
       required String note,
       DateTime? deadline,
       required List<int> weekdays,
-      int? remindBefore}) {
+      int? remindBefore,
+      int? timeOfDay}) {
     s
       ..title = title
       ..note = note
       ..deadline = deadline
       ..weekdays = weekdays
-      ..remindBefore = remindBefore;
+      ..remindBefore = remindBefore
+      ..timeOfDay = timeOfDay;
     return _commit();
   }
 

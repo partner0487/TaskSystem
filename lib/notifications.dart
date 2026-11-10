@@ -134,7 +134,8 @@ class Notifier {
         // 逾期超過 7 天的主線 / 支線不再放通知欄（App 裡還看得到）
         if (isStale(q.type, s, now)) continue;
 
-        if (!s.done && isActiveOn(q.type, s, now)) {
+        // 有時間的每日任務（例如「晚餐後吃藥 18:00」）時間到才出現；之前走下面的預約
+        if (!s.done && isActiveOn(q.type, s, now) && !beforeDailyTime(q.type, s, now)) {
           keepActive.add(s.id);
           await plugin.show(
             id: s.id, // 用細項 id 當通知 id，才能精準取消
@@ -144,8 +145,9 @@ class Notifier {
             notificationDetails: _details(q, s, now),
           );
         } else {
-          // 已完成的每日 / 每週，或今天不是它的日子（例如週一的「週六日籃球」）：
-          // 預約在下一個該出現的日子凌晨 4 點出現
+          // 已完成的每日 / 每週、今天不是它的日子（例如週一的「週六日籃球」），
+          // 或時間還沒到（例如早上的「晚餐後吃藥 18:00」）：
+          // 預約在下一次該出現的時候出現（凌晨 4 點，或有指定的時間）
           final at = nextResetFor(q.type, s, now);
           if (at != null) {
             keepPending.add(_resetIdOffset + s.id);
@@ -182,7 +184,7 @@ class Notifier {
             id: _reminderIdOffset + s.id,
             scheduledDate: tz.TZDateTime.from(at, tz.UTC),
             androidScheduleMode: mode,
-            title: '${durationText(s.remindBefore!)}後到期：${s.title}',
+            title: reminderTitle(q.type, s),
             body: notificationDeadlineText(s, q.type, at),
             payload: '${s.id}',
             notificationDetails: _reminderDetails(q),

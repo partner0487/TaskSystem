@@ -222,6 +222,62 @@ void main() {
     expect(weekdaysText(s), '每週一、三、五');
   });
 
+  group('有時間的每日任務（吃藥）', () {
+    QuestStep pill(int hour, {bool done = false}) =>
+        QuestStep(id: 1, title: '晚餐後吃藥', timeOfDay: hour * 60, remindBefore: 0, done: done);
+
+    test('時間到才出現：18:00 前不顯示、之後顯示', () {
+      final s = pill(18);
+      expect(beforeDailyTime(QuestType.daily, s, DateTime(2026, 11, 10, 17, 59)), isTrue);
+      expect(beforeDailyTime(QuestType.daily, s, DateTime(2026, 11, 10, 18, 0)), isFalse);
+      expect(beforeDailyTime(QuestType.daily, s, DateTime(2026, 11, 11, 2)), isFalse); // 半夜還算昨天，已經過了
+      // 每日任務一律可以打勾（提早吃藥也行）
+      expect(isActiveOn(QuestType.daily, s, DateTime(2026, 11, 10, 9)), isTrue);
+    });
+
+    test('凌晨 4 點前的時間屬於「這一天」的深夜', () {
+      final bedtime = QuestStep(id: 2, title: '睡前吃藥', timeOfDay: 60); // 01:00
+      expect(dailyTimeOn(bedtime, DateTime(2026, 11, 10)), DateTime(2026, 11, 11, 1));
+      expect(beforeDailyTime(QuestType.daily, bedtime, DateTime(2026, 11, 10, 23)), isTrue);
+    });
+
+    test('預約出現的時間：今天還沒到 → 今天；已完成或已過 → 明天', () {
+      expect(nextResetFor(QuestType.daily, pill(18), DateTime(2026, 11, 10, 9)),
+          DateTime(2026, 11, 10, 18));
+      expect(nextResetFor(QuestType.daily, pill(18, done: true), DateTime(2026, 11, 10, 9)),
+          DateTime(2026, 11, 11, 18));
+      expect(nextResetFor(QuestType.daily, pill(18), DateTime(2026, 11, 10, 19)),
+          DateTime(2026, 11, 11, 18));
+    });
+
+    test('提醒：準時；提早吃了就排明天', () {
+      expect(nextReminderTime(QuestType.daily, pill(12), DateTime(2026, 11, 10, 9)),
+          DateTime(2026, 11, 10, 12));
+      expect(nextReminderTime(QuestType.daily, pill(12, done: true), DateTime(2026, 11, 10, 9)),
+          DateTime(2026, 11, 11, 12));
+      final early = pill(18)..remindBefore = 10;
+      expect(nextReminderTime(QuestType.daily, early, DateTime(2026, 11, 10, 9)),
+          DateTime(2026, 11, 10, 17, 50));
+      // 沒設時間的每日任務不提醒
+      expect(nextReminderTime(QuestType.daily, QuestStep(id: 3, title: 'x', remindBefore: 0),
+          DateTime(2026, 11, 10)), isNull);
+    });
+
+    test('文字', () {
+      expect(reminderTitle(QuestType.daily, pill(18)), '時間到：晚餐後吃藥');
+      expect(reminderTitle(QuestType.daily, pill(18)..remindBefore = 10), '10 分鐘後：晚餐後吃藥');
+      expect(notificationDeadlineText(pill(18), QuestType.daily, DateTime(2026, 11, 10)), '每天 18:00');
+      expect(remindOptionText(0), '準時');
+      expect(remindOptionText(null), '不提醒');
+      expect(timeText(9 * 60 + 5), '09:05');
+    });
+
+    test('備份會保留時間', () {
+      final s = QuestStep.fromJson(pill(18).toJson());
+      expect(s.timeOfDay, 18 * 60);
+    });
+  });
+
   test('提醒時間與文字', () {
     final s = QuestStep(id: 1, title: 'x', deadline: DateTime(2026, 11, 9, 18), remindBefore: 60);
     expect(s.remindAt, DateTime(2026, 11, 9, 17));

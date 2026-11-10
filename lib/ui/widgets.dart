@@ -140,10 +140,19 @@ class StepCard extends StatelessWidget {
   /// 今天不是它的日子（例如週一的「週六日籃球」）
   bool get _resting => !isActiveOn(type, step, now);
 
-  /// 有設震動提醒（主線 / 支線要有期限才算；每週用自動期限）
+  /// 有時間的每日任務，時間還沒到（變暗，但可以提早打勾）
+  bool get _beforeTime => beforeDailyTime(type, step, now);
+
+  /// 有時間的每日任務，時間到了還沒做
+  bool get _timeUp =>
+      type == QuestType.daily && step.timeOfDay != null && !step.done && !_beforeTime;
+
+  /// 有設震動提醒（主線 / 支線要有期限才算；每週用自動期限；每日要有固定時間）
   bool get _hasReminder =>
       step.remindBefore != null &&
-      (type == QuestType.weekly || !type.recurring && step.deadline != null);
+      (type == QuestType.weekly ||
+          type == QuestType.daily && step.timeOfDay != null ||
+          !type.recurring && step.deadline != null);
 
   /// 已完成：什麼時候重新出現；每週任務休息中：哪天出現；其它：期限。
   String _subtitle() {
@@ -156,20 +165,34 @@ class StepCard extends StatelessWidget {
       final label = '${nextResetLabel(next, now)}出現';
       return ended ? '本次已結束・$label' : '${weekdaysText(step)}・$label';
     }
+    // 有時間的每日任務：「18:00 出現・剩 3 小時 20 分」→「時間到・18:00」
+    final t = step.timeOfDay;
+    if (type == QuestType.daily && t != null) {
+      if (_beforeTime) {
+        final at = dailyTimeOn(step, gameDay(now))!;
+        return '${timeText(t)} 出現・${remainingText(at.difference(now))}';
+      }
+      return '時間到・${timeText(t)}';
+    }
     final text = deadlineText(step, type, now);
     return isStale(type, step, now) ? '$text・已移出通知欄' : text;
   }
 
   @override
   Widget build(BuildContext context) {
-    final dim = step.done || _resting; // 已完成或今天休息：顏色變淡
+    // 已完成、今天休息、或時間還沒到：顏色變淡
+    final dim = step.done || _resting || _beforeTime;
     final deadline = effectiveDeadline(type, step, now); // 每週任務會自動有期限
     // 只有主線 / 支線會「已逾期」；每週過了 12 點是「本次已結束」
     final overdue = !step.done && !type.recurring && deadline != null && deadline.isBefore(now);
     // 24 小時內到期（還沒逾期）
-    final urgent = !step.done && !_resting && !overdue &&
-        deadline != null &&
-        deadline.difference(now) < const Duration(hours: 24);
+    // 或是有時間的每日任務已經「時間到」→ 也用藍色條提醒
+    final urgent = _timeUp ||
+        !step.done &&
+            !_resting &&
+            !overdue &&
+            deadline != null &&
+            deadline.difference(now) < const Duration(hours: 24);
     final titleColor = selected ? GColors.textDark : (dim ? GColors.sub : GColors.text);
     final subColor = overdue
         ? GColors.overdue

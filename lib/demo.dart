@@ -51,6 +51,12 @@ AppData demoData() {
       step('打掃房間'),
       step('籃球', weekdays: [DateTime.saturday, DateTime.sunday]),
     ]),
+    Quest(id: d.newId(), title: '感冒吃藥', type: QuestType.daily, steps: [
+      // 早上截圖時：早餐那次「時間到」，午餐、晚餐還沒到（展示兩種狀態）
+      _timed(d, '早餐後吃藥', 8 * 60),
+      _timed(d, '午餐後吃藥', 12 * 60),
+      _timed(d, '晚餐後吃藥', 18 * 60),
+    ]),
     Quest(id: d.newId(), title: '每日任務', type: QuestType.daily, steps: [
       step('喝水 2000cc'),
       step('整理桌面'),
@@ -60,3 +66,11 @@ AppData demoData() {
   d.lastReset = resetDayKey(now); // 已經是今天，不要被重置掉展示用的「已完成」
   return d;
 }
+
+/// 展示用：固定時間的每日任務（[minutes] = 從午夜起算的分鐘），準時提醒。
+QuestStep _timed(AppData d, String title, int minutes) => QuestStep(
+      id: d.newId(),
+      title: title,
+      timeOfDay: minutes,
+      remindBefore: 0,
+    );

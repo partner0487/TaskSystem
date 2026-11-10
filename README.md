@@ -15,10 +15,11 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/main.png" width="200" alt="主線任務">
-  <img src="docs/screenshots/side.png" width="200" alt="支線任務">
-  <img src="docs/screenshots/weekly.png" width="200" alt="每週任務">
-  <img src="docs/screenshots/edit.png" width="200" alt="編輯細項">
+  <img src="docs/screenshots/main.png" width="180" alt="主線任務">
+  <img src="docs/screenshots/side.png" width="180" alt="支線任務">
+  <img src="docs/screenshots/weekly.png" width="180" alt="每週任務">
+  <img src="docs/screenshots/daily.png" width="180" alt="每日任務">
+  <img src="docs/screenshots/edit.png" width="180" alt="設定每天固定時間">
 </p>
 
 ---
@@ -36,7 +37,7 @@
 | **主線任務** | 重要的事：專題、考試、搬家 | 可設期限與提醒 |
 | **支線任務** | 零碎的事：購物清單、還書 | 可設期限與提醒 |
 | **每週任務** | 固定的習慣：每週一三五運動 | 選星期幾，只在那幾天出現，當天 24:00 截止 |
-| **每日任務** | 每天都要做：喝水、背單字 | 每天凌晨 4:00 自動重新出現 |
+| **每日任務** | 每天都要做：喝水、背單字、吃藥 | 每天凌晨 4:00 重新出現；可設「每天幾點」，時間到才出現並震動提醒 |
 
 每個「大事件」（例如「期末專題」）底下可以有多個「細項」（例如「完成系統架構圖」），一步一步完成。
 
@@ -45,6 +46,12 @@
 - 24 小時內到期，卡片左側出現**藍色條**，通知上也會顯示倒數計時
 - 已經逾期會變成**紅色**；逾期 7 天後自動移出通知欄，但 App 裡仍保留，由你決定要補做還是刪除
 - 沒有期限的任務也可以，當成記事本使用
+
+### 💊 每天固定時間的任務
+生病要飯後吃藥？在每日任務新增「午餐後吃藥 12:00」「晚餐後吃藥 18:00」：
+- 時間到才出現在通知欄，並**準時震動提醒**（也可以提早 10／30 分鐘）
+- 時間還沒到時，App 裡會變暗並倒數；提早吃了也可以先打勾，當天就不會再提醒
+- 每一次分開打勾，中午吃了、晚上那次還在
 
 ### 📳 只震動、不吵人的提醒
 截止前 **10 分鐘／1 小時／1 天** 震動提醒，不會響鈴。

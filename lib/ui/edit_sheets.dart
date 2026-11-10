@@ -10,6 +10,7 @@ typedef StepInput = ({
   DateTime? deadline,
   List<int> weekdays,
   int? remindBefore,
+  int? timeOfDay,
 });
 
 Future<T?> _sheet<T>(BuildContext context, Widget child) {
@@ -149,6 +150,24 @@ class _StepFormState extends State<_StepForm> {
   late int? _remind = widget.step != null
       ? widget.step!.remindBefore
       : (widget.type.recurring ? null : 60);
+  // 每日任務的「每天幾點」（分鐘）
+  late int? _time = widget.step?.timeOfDay;
+
+  bool get _isDaily => widget.type == QuestType.daily;
+
+  Future<void> _pickTime() async {
+    final init = _time ?? 12 * 60;
+    final t = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: init ~/ 60, minute: init % 60),
+    );
+    if (t == null) return;
+    setState(() {
+      // 第一次設定時間時，預設「準時」提醒
+      if (_time == null && _remind == null) _remind = 0;
+      _time = t.hour * 60 + t.minute;
+    });
+  }
 
   @override
   void dispose() {
@@ -186,8 +205,9 @@ class _StepFormState extends State<_StepForm> {
       // 每日 / 每週不使用手動期限，存檔時清掉，避免日後改分類時冒出舊期限
       deadline: recurring ? null : _deadline,
       weekdays: _weekdays.toList()..sort(),
-      // 每日任務沒有期限，不提醒；每週任務可以
-      remindBefore: widget.type == QuestType.daily ? null : _remind,
+      // 每日任務要有固定時間才能提醒；其它照選的
+      remindBefore: _isDaily && _time == null ? null : _remind,
+      timeOfDay: _isDaily ? _time : null,
     ));
   }
 
@@ -211,11 +231,31 @@ class _StepFormState extends State<_StepForm> {
           maxLines: 5,
           decoration: const InputDecoration(labelText: '備註（可留空）'),
         ),
-        if (widget.type == QuestType.daily)
-          const Padding(
-            padding: EdgeInsets.only(top: 16),
-            child: Text('每天凌晨 04:00 重新出現', style: TextStyle(color: GColors.sub)),
+        // 每日任務可以設「每天幾點」：例如午餐後 12:00、晚餐後 18:00 吃藥
+        if (_isDaily) ...[
+          const SizedBox(height: 8),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('每天固定時間'),
+            subtitle: Text(_time == null
+                ? '沒有：每天凌晨 04:00 出現'
+                : '每天 ${timeText(_time!)}（時間到才出現在通知欄）'),
+            value: _time != null,
+            onChanged: (on) {
+              if (on) {
+                _pickTime();
+              } else {
+                setState(() => _time = null);
+              }
+            },
           ),
+          if (_time != null)
+            TextButton.icon(
+              onPressed: _pickTime,
+              icon: const Icon(Icons.schedule),
+              label: const Text('更改時間'),
+            ),
+        ],
         if (widget.type == QuestType.weekly) ...[
           const SizedBox(height: 16),
           Text(
@@ -268,8 +308,11 @@ class _StepFormState extends State<_StepForm> {
             icon: const Icon(Icons.edit_calendar),
             label: const Text('更改期限'),
           ),
-        // 震動提醒：主線 / 支線要先設期限；每週任務用自動期限（當天 / 週日 24:00）
-        if (!widget.type.recurring && _deadline != null || widget.type == QuestType.weekly) ...[
+        // 震動提醒：主線 / 支線要先設期限；每週任務用自動期限（當天 / 週日 24:00）；
+        // 每日任務要先設固定時間
+        if (!widget.type.recurring && _deadline != null ||
+            widget.type == QuestType.weekly ||
+            _isDaily && _time != null) ...[
           const SizedBox(height: 8),
           Text(
             widget.type == QuestType.weekly ? '震動提醒（截止 24:00 前，不響鈴）' : '震動提醒（不響鈴）',
@@ -279,9 +322,9 @@ class _StepFormState extends State<_StepForm> {
           Wrap(
             spacing: 6,
             children: [
-              for (final m in remindOptions)
+              for (final m in _isDaily ? dailyRemindOptions : remindOptions)
                 ChoiceChip(
-                  label: Text(m == null ? '不提醒' : '${durationText(m)}前'),
+                  label: Text(remindOptionText(m)),
                   avatar: m == null ? null : const Icon(Icons.vibration, size: 16),
                   selected: _remind == m,
                   onSelected: (_) => setState(() => _remind = m),
