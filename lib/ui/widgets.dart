@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import '../models.dart';
 import '../theme.dart';
 
-/// 原神任務標題左邊那個菱形圖示。
+/// 標題左邊的菱形圖示（App 的代表符號）。
 class DiamondIcon extends StatelessWidget {
   const DiamondIcon({super.key, this.size = 14, this.color = GColors.gold, this.filled = false});
 
@@ -42,7 +42,7 @@ class DiamondIcon extends StatelessWidget {
   }
 }
 
-/// 大事件的標題列（例如「異象」），點一下展開 / 收合。
+/// 大事件的標題列（例如「期末報告」），點一下展開 / 收合。
 class QuestHeader extends StatelessWidget {
   const QuestHeader({
     super.key,
@@ -116,7 +116,7 @@ class QuestHeader extends StatelessWidget {
   }
 }
 
-/// 細項卡片（例如「異象・至冬」）。選中時變成米白底 + 金框，跟原神一樣。
+/// 細項卡片（例如「整理參考資料」）。選中時變成米白底 + 金框。
 class StepCard extends StatelessWidget {
   const StepCard({
     super.key,
@@ -166,7 +166,8 @@ class StepCard extends StatelessWidget {
     final deadline = effectiveDeadline(type, step, now); // 每週任務會自動有期限
     // 只有主線 / 支線會「已逾期」；每週過了 12 點是「本次已結束」
     final overdue = !step.done && !type.recurring && deadline != null && deadline.isBefore(now);
-    final urgent = !step.done && !_resting &&
+    // 24 小時內到期（還沒逾期）
+    final urgent = !step.done && !_resting && !overdue &&
         deadline != null &&
         deadline.difference(now) < const Duration(hours: 24);
     final titleColor = selected ? GColors.textDark : (dim ? GColors.sub : GColors.text);
@@ -204,7 +205,13 @@ class StepCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     // 快到期（24 小時內）時左邊的藍色條
-                    Container(width: 5, color: urgent ? GColors.accent : Colors.transparent),
+                    // 左側色條：快到期 = 藍色，已逾期 = 紅色
+                    Container(
+                      width: 5,
+                      color: overdue
+                          ? GColors.overdue
+                          : (urgent ? GColors.accent : Colors.transparent),
+                    ),
                     Expanded(
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),

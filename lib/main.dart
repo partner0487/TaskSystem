@@ -3,13 +3,18 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
+import 'demo.dart';
 import 'notifications.dart';
+import 'storage.dart';
 import 'store.dart';
 import 'theme.dart';
 import 'ui/home_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 展示模式：每次啟動都重新產生展示資料（倒數時間永遠是新的）
+  if (demoMode) await Storage.write(demoData());
 
   final store = QuestStore();
   await Notifier.init(onDataChanged: store.reload);

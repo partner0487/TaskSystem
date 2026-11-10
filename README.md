@@ -1,63 +1,136 @@
-# 任務系統
+<p align="center">
+  <img src="docs/icon.png" width="96" alt="任務系統圖示">
+</p>
 
-參考原神任務介面的 Android 待辦清單 App，用 Flutter 開發。
-未完成的任務會常駐在**通知欄**，完成後勾選，通知就會自動消失。
+<h1 align="center">任務系統</h1>
 
-## 功能
+<p align="center">
+  把待辦事項變成任務清單，未完成的任務常駐在通知欄，<br>
+  拉下通知欄就知道還有什麼要做，做完直接打勾。
+</p>
 
-- **四種分類**：主線任務、支線任務、每週任務、每日委託
-- **大事件 → 細項**：每個大事件（例如「期末考」）底下可以有多個細項（例如「讀第三章」）
-- **期限可有可無**：細項可以設定截止時間，也可以不設，當成記事本使用
-- **通知欄常駐**：每個未完成的細項都是一則常駐通知，不會響鈴打擾；滑掉會自動彈回
-- **在通知欄直接完成**：通知上有「✓ 完成」按鈕，App 沒開也能勾選
-- **每日自動重置**：每日委託在每天凌晨 4:00 重置（跟原神一樣），App 沒開也會重新出現
-- **每週任務**：可勾選星期幾（例如「每週一、三、五運動」），只在那幾天出現、當天 24:00 截止；
-  沒勾就是整週都在、週日 24:00 截止。時間到就自動消失，不會顯示「已逾期」
-- **主線／支線的期限**：可自己設定；逾期滿 7 天自動移出通知欄（App 裡仍保留，由你決定完成或刪除）
-- **到期前震動提醒**：主線／支線（依設定的期限）、每週任務（依當天／週日 24:00），
-  可選 10 分鐘／1 小時／1 天前，只震動不響鈴
-- **倒數顯示**：剩 X 天 Y 小時 → 剩 X 小時 Y 分 → 剩 X 分 Y 秒；24 小時內通知上也會顯示倒數計時
-- **開機自動補回**：重開機後通知會自動回到通知欄
+<p align="center">
+  <a href="https://github.com/partner0487/TaskSystem/releases/latest"><b>⬇ 下載最新版 APK</b></a>
+  ・Android 7.0 以上
+</p>
 
-## 操作方式
+<p align="center">
+  <img src="docs/screenshots/main.png" width="200" alt="主線任務">
+  <img src="docs/screenshots/side.png" width="200" alt="支線任務">
+  <img src="docs/screenshots/weekly.png" width="200" alt="每週任務">
+  <img src="docs/screenshots/edit.png" width="200" alt="編輯細項">
+</p>
+
+---
+
+## 特色
+
+### 📌 任務常駐在通知欄
+每個還沒完成的任務都會安靜地待在通知欄：不響鈴、不跳出，但一拉下來就看得到。
+展開通知就能直接按 **「✓ 完成」**，不用打開 App。
+不小心滑掉了？它會自己回來。重開機後也會自動補回。
+
+### 🗂️ 四種任務，大事件底下再分細項
+| 分類 | 適合 | 規則 |
+|---|---|---|
+| **主線任務** | 重要的事：專題、考試、搬家 | 可設期限與提醒 |
+| **支線任務** | 零碎的事：購物清單、還書 | 可設期限與提醒 |
+| **每週任務** | 固定的習慣：每週一三五運動 | 選星期幾，只在那幾天出現，當天 24:00 截止 |
+| **每日委託** | 每天都要做：喝水、背單字 | 每天凌晨 4:00 自動重新出現 |
+
+每個「大事件」（例如「期末專題」）底下可以有多個「細項」（例如「完成系統架構圖」），一步一步完成。
+
+### ⏳ 一眼看出還剩多久
+- 倒數會隨時間變精細：**剩 2 天 5 小時 → 剩 5 小時 30 分 → 剩 12 分 30 秒**
+- 24 小時內到期，卡片左側出現**藍色條**，通知上也會顯示倒數計時
+- 已經逾期會變成**紅色**；逾期 7 天後自動移出通知欄，但 App 裡仍保留，由你決定要補做還是刪除
+- 沒有期限的任務也可以，當成記事本使用
+
+### 📳 只震動、不吵人的提醒
+截止前 **10 分鐘／1 小時／1 天** 震動提醒，不會響鈴。
+想改成有聲音？到 Android 設定 → 通知 → 任務系統 → 到期提醒，自己調整。
+
+### 🔁 自動重置，不用每天重新輸入
+- 每日委託每天凌晨 4:00 重新出現（熬夜到凌晨 3 點，今天的任務還在）
+- 每週任務只在選定的日子出現，其他日子會變暗、不能打勾
+- App 沒開也會照時間出現與消失
+
+### 🛟 用得安心
+- 刪除、打勾按錯了？下方會出現 **「復原」**
+- 一鍵**匯出備份**成一個檔案，換手機時再**匯入**即可
+- 所有資料只存在你的手機裡，不需要帳號、不連網路
+
+---
+
+## 下載與安裝
+
+1. 到 [Releases](https://github.com/partner0487/TaskSystem/releases/latest) 下載 `TaskSystem-vX.Y.Z.apk`，點開安裝
+2. 如果跳出「不允許安裝不明應用程式」，依畫面指示允許這次安裝
+3. 如果 Play Protect 警告「未知的開發人員」，點「更多詳細資料 → 仍要安裝」
+4. 第一次打開時**允許通知**，任務才會出現在通知欄
+5. 建議把電池設為**不受限制**（App 裡 ⋮ → 背景執行設定 → 電池），通知欄的「完成」才會穩定運作
+
+## 使用方式
 
 | 想做的事 | 操作 |
 |---|---|
 | 新增大事件 | 點右下角的 ＋ |
-| 新增細項 | 點大事件底下的「新增細項」，或標題右邊的 ⋮ → 新增細項 |
-| 完成細項 | 點卡片右側的 ✓，或在通知欄按「✓ 完成」（按錯可以「復原」） |
-| 查看備註 | 點一下細項卡片（會變成米白色並展開備註） |
-| 編輯細項 | 點一下細項卡片選中，再按「✎ 編輯」 |
-| 刪除細項 | 細項卡片往左滑（按錯可以「復原」） |
+| 新增細項 | 點大事件底下的「新增細項」 |
+| 完成細項 | 點卡片右側的 ✓，或在通知欄按「✓ 完成」 |
+| 查看備註 | 點一下細項卡片 |
+| 編輯細項 | 點一下細項卡片，再按「✎ 編輯」 |
+| 刪除細項 | 細項卡片往左滑 |
 | 排序 | **長按**細項卡片或大事件標題，拖曳到想要的位置 |
 | 編輯／刪除大事件 | 大事件標題右邊的 ⋮ |
-| 展開／收合大事件 | 點大事件標題 |
-| 清除已完成 | 右上角 ⋮ → 清除已完成（只清主線／支線；每日／每週會自己重置） |
+| 清除已完成 | 右上角 ⋮ → 清除已完成 |
+| 備份／還原 | 右上角 ⋮ → 匯出備份／匯入備份 |
 
-## 專案結構
+## 常見問題
 
-```
-lib/
-├── main.dart            App 進入點：初始化通知、要求權限、讀取資料
-├── models.dart          資料結構（分類、大事件、細項）與期限文字
-├── storage.dart         存檔讀寫（shared_preferences，存成 JSON）
-├── store.dart           狀態管理：新增／修改／刪除都經過這裡，並同步通知欄
-├── notifications.dart   通知欄：顯示、移除通知，處理「✓ 完成」按鈕
-├── theme.dart           原神風格配色
-└── ui/
-    ├── home_page.dart   主畫面（分類分頁 + 任務列表）
-    ├── widgets.dart     菱形圖示、大事件標題、細項卡片等元件
-    └── edit_sheets.dart 新增／編輯用的底部表單
-```
+**通知欄沒有出現任務？**
+App 頂端如果有紅色提示，表示通知被關掉了，點「開啟」即可。
 
-## 開發環境
+**在通知欄按「完成」沒反應、滑掉後沒有彈回？**
+通常是手機的省電機制擋住了背景執行。到 ⋮ → 背景執行設定 → 電池，設為「不受限制」。
+
+**每日任務沒有準時在 4:00 出現？**
+為了省電，系統可能會晚一點（最多約 1 小時）才讓它出現；打開 App 會立刻更新。
+
+---
+
+## 開發
+
+### 環境
 
 - Flutter 3.47 以上（Dart 3.13）
 - JDK 17
 - Android SDK（API 37 編譯，最低支援 Android 7.0 / API 24）
 - 編輯器：VS Code + Flutter 擴充套件（不需要 Android Studio）
 
-## 在手機上執行
+### 專案結構
+
+```
+lib/
+├── main.dart            App 進入點：初始化通知、要求權限、讀取資料；開機補發通知的入口
+├── models.dart          資料結構（分類、大事件、細項）與時間規則：重置、期限、倒數、提醒
+├── store.dart           狀態管理：新增／修改／刪除／排序／復原都經過這裡，並同步通知欄
+├── storage.dart         存檔讀寫（shared_preferences，存成 JSON）
+├── notifications.dart   通知欄：常駐通知、預約重置、震動提醒、「✓ 完成」與滑掉彈回
+├── backup.dart          匯出／匯入備份檔的格式與檢查
+├── system.dart          呼叫 Android 原生功能（電池設定、版本號、開網址）
+├── demo.dart            展示模式的資料（截圖用）
+├── theme.dart           配色
+└── ui/
+    ├── home_page.dart   主畫面：分類分頁、任務列表、拖曳排序、設定提示
+    ├── widgets.dart     菱形圖示、大事件標題、細項卡片、勾選按鈕
+    └── edit_sheets.dart 新增／編輯用的底部表單
+
+android/app/src/main/kotlin/…/
+├── MainActivity.kt      原生功能的實作（給 system.dart 用）
+└── BootReceiver.kt      開機／更新後，在背景把通知補回通知欄
+```
+
+### 在手機上執行
 
 1. 手機開啟**開發人員選項**：設定 → 關於手機 → 軟體資訊 → 連點「版本號碼」7 次
 2. 開發人員選項 → 打開 **USB 偵錯**
@@ -68,87 +141,21 @@ lib/
 修改 Dart 程式碼後存檔即可**熱重載**；修改通知相關的程式碼請按 **Ctrl + Shift + F5** 熱重啟；
 修改 `android/` 底下的檔案（圖示、App 名稱、權限）則需要停止後重新按 F5。
 
-## 常用指令
+### 常用指令
 
 ```bash
-flutter pub get          # 安裝套件
-flutter run              # 在已連接的手機上執行
-flutter test             # 執行測試
-flutter analyze          # 靜態檢查
-flutter build apk        # 打包 APK（輸出在 build/app/outputs/flutter-apk/）
+flutter pub get                          # 安裝套件
+flutter run                              # 在已連接的手機上執行
+flutter run --dart-define=DEMO=true      # 展示模式（用另一份示範資料，不動到真實資料）
+flutter test                             # 執行測試
+flutter analyze                          # 靜態檢查
+flutter build apk --release --split-per-abi   # 打包 APK（輸出在 build/app/outputs/flutter-apk/）
 ```
 
-## 備份與換手機
+### 使用的套件
 
-右上角 ⋮ → **匯出備份**，存成一個 `.json` 檔（可以存到下載資料夾、Google 雲端硬碟…）。
-換手機或重裝時，⋮ → **匯入備份** 選那個檔案即可。匯入會取代目前所有任務，按錯可以馬上「復原」。
-
-## 發佈新版本（GitHub Releases + gh）
-
-### 一次性設定
-
-1. 安裝 GitHub CLI：`winget install GitHub.cli`
-2. 登入：`gh auth login`，依序選 **GitHub.com → HTTPS → Login with a web browser**，
-   把畫面上的 8 碼代碼貼到瀏覽器開啟的頁面
-3. 確認：`gh auth status`
-
-### 簽章金鑰（非常重要）
-
-正式版用 `android/key.properties` 指定的金鑰簽章，**這個檔案和金鑰 `.jks` 都不在 git 裡**。
-
-- 每次更新都必須用**同一把金鑰**，否則使用者無法直接升級，只能刪掉重裝（資料會消失）
-- 請把 `.jks` 和 `key.properties` 備份到安全的地方（密碼管理器、加密的雲端硬碟）
-- 沒有 `key.properties` 時，release 會改用 debug 金鑰（只適合自己測試，不要拿去發佈）
-
-### 每次發佈的步驟
-
-```bash
-# 1. 改版本號：pubspec.yaml 的 version，+ 後面的數字每次都要變大
-#    例如 1.0.0+1 → 1.0.1+2
-
-# 2. 確認測試都通過
-flutter test
-
-# 3. 編譯（依手機 CPU 分開打包；一般手機用 arm64-v8a）
-flutter build apk --release --split-per-abi
-
-# 4. 改成好認的檔名
-cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk TaskSystem-v1.0.1.apk
-
-# 5. 先建立「草稿」，到網頁上確認內容（只有自己看得到）
-gh release create v1.0.1 TaskSystem-v1.0.1.apk --title "v1.0.1" --notes-file release-notes.md --draft
-gh release view v1.0.1 --web
-
-# 6. 確認沒問題後正式公開
-gh release edit v1.0.1 --draft=false
-```
-
-### 其他常用指令
-
-| 指令 | 用途 |
-|---|---|
-| `gh release list` | 列出所有版本 |
-| `gh release view v1.0.1` | 查看某個版本的內容 |
-| `gh release upload v1.0.1 檔案.apk --clobber` | 補傳或替換某個版本的檔案 |
-| `gh release edit v1.0.1 --notes-file notes.md` | 修改版本說明 |
-| `gh release delete v1.0.1 --cleanup-tag` | 刪除版本（連同 git tag） |
-
-### 給下載者的安裝說明（可以貼在版本說明裡）
-
-1. 下載 `TaskSystem-vX.Y.Z.apk`，點開安裝
-2. 如果跳出「不允許安裝不明應用程式」，依畫面指示允許這次安裝
-3. 如果 Play Protect 警告「未知的開發人員」，點「更多詳細資料 → 仍要安裝」
-4. 第一次打開時**允許通知**，任務才會出現在通知欄
-5. Samsung 手機建議：設定 → 電池 → 背景使用限制，把「任務系統」設為**不受限制**
-
-## 已知限制
-
-- 每日／每週的重新出現用省電的不精確鬧鐘，可能比 04:00 晚一點（最多約 1 小時）
-- 震動提醒的強度、要不要響鈴，可以到 Android 設定 → 通知 → 任務系統 → **到期提醒** 自行調整
-- Samsung 的省電機制可能影響背景功能：若「在通知欄按完成」或「滑掉彈回」沒有作用，請到 設定 → 電池 → 背景使用限制，把「任務系統」設為**不受限制**
-
-## 使用的套件
-
-- [flutter_local_notifications](https://pub.dev/packages/flutter_local_notifications)：通知欄
+- [flutter_local_notifications](https://pub.dev/packages/flutter_local_notifications)：通知欄、預約通知
 - [shared_preferences](https://pub.dev/packages/shared_preferences)：資料儲存
+- [file_picker](https://pub.dev/packages/file_picker)：匯出／匯入備份檔
+- [timezone](https://pub.dev/packages/timezone)：預約通知的時間
 - flutter_localizations：日期／時間選擇器中文化

@@ -225,16 +225,20 @@ class _StepFormState extends State<_StepForm> {
             style: const TextStyle(color: GColors.sub),
           ),
           const SizedBox(height: 6),
-          Wrap(
-            spacing: 6,
+          // 一～日 平均分成七格，任何螢幕寬度都排得下一行
+          Row(
             children: [
               for (var d = DateTime.monday; d <= DateTime.sunday; d++)
-                FilterChip(
-                  label: Text(weekNames[d - 1]),
-                  showCheckmark: false,
-                  selected: _weekdays.contains(d),
-                  onSelected: (on) =>
-                      setState(() => on ? _weekdays.add(d) : _weekdays.remove(d)),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    child: _DayToggle(
+                      label: weekNames[d - 1],
+                      selected: _weekdays.contains(d),
+                      onTap: () => setState(
+                          () => _weekdays.contains(d) ? _weekdays.remove(d) : _weekdays.add(d)),
+                    ),
+                  ),
                 ),
             ],
           ),
@@ -308,4 +312,38 @@ Future<bool> confirmDelete(BuildContext context, String name) async {
     ),
   );
   return ok ?? false;
+}
+
+/// 星期幾的選擇格（選中 = 金色底）。
+class _DayToggle extends StatelessWidget {
+  const _DayToggle({required this.label, required this.selected, required this.onTap});
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        height: 42,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? GColors.gold.withValues(alpha: 0.35) : Colors.transparent,
+          border: Border.all(color: selected ? GColors.gold : Colors.white24),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? GColors.goldBright : GColors.text,
+            fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+      ),
+    );
+  }
 }

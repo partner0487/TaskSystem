@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// 任務分類，對應原神的「主線 / 支線 / 每週 / 每日」。
+/// 任務分類：主線 / 支線 / 每週 / 每日。
 /// 宣告順序就是畫面上方分頁的順序。
 /// 沒有期限的任務不另外分類：任何分類的細項都可以不設期限。
 enum QuestType { main, side, weekly, daily }
@@ -15,7 +15,7 @@ extension QuestTypeInfo on QuestType {
 
   IconData get icon => switch (this) {
         QuestType.main => Icons.auto_awesome,
-        QuestType.side => Icons.new_releases_outlined, // 像原神突發任務的「!」
+        QuestType.side => Icons.new_releases_outlined, // 突發任務的「!」
         QuestType.weekly => Icons.event_repeat,
         QuestType.daily => Icons.wb_sunny_outlined,
       };
@@ -86,7 +86,7 @@ class QuestStep {
       );
 }
 
-/// 大事件，例如「異象」，底下有多個細項。
+/// 大事件，例如「期末報告」，底下有多個細項。
 class Quest {
   Quest({
     required this.id,
@@ -219,7 +219,7 @@ class AppData {
 
 const weekNames = ['一', '二', '三', '四', '五', '六', '日'];
 
-/// 「遊戲日」：以凌晨 4 點為一天的分界（跟原神一樣），凌晨 3 點還算前一天。
+/// 「任務日」：以凌晨 4 點為一天的分界，凌晨 3 點還算前一天（熬夜時任務不會被提早重置）。
 DateTime gameDay(DateTime now) {
   final d = now.subtract(const Duration(hours: 4));
   return DateTime(d.year, d.month, d.day);

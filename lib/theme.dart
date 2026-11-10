@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// 參考原神任務介面的配色。
+/// App 配色：深藍底、金色標題、米白色選中卡片。
 class GColors {
   static const bgTop = Color(0xFF1B2130);
   static const bgBottom = Color(0xFF2A3245);

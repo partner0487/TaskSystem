@@ -2,17 +2,19 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'demo.dart';
 import 'models.dart';
 
 /// 讀寫存檔。用 SharedPreferencesAsync（沒有快取），
 /// 這樣通知欄按「完成」時在背景改的資料，App 這邊讀得到最新的。
 class Storage {
-  static const _key = 'quest_data_v1';
+  // 展示模式用另一份存檔，不會動到真實資料
+  static const _key = demoMode ? 'quest_data_demo' : 'quest_data_v1';
   static final _prefs = SharedPreferencesAsync();
 
   static Future<AppData> read() async {
     final raw = await _prefs.getString(_key);
-    if (raw == null) return AppData.sample();
+    if (raw == null) return demoMode ? demoData() : AppData.sample();
     return AppData.fromJson(jsonDecode(raw) as Map<String, dynamic>);
   }
 

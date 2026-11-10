@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../backup.dart';
+import '../demo.dart';
 import '../models.dart';
 import '../notifications.dart';
 import '../storage.dart';
@@ -39,6 +40,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   /// 檢查通知權限與電池設定；App 開啟、回到前景時都會做（從設定頁回來就會更新）。
   Future<void> _checkSetup() async {
+    if (demoMode) return; // 展示 / 截圖時不顯示設定提示
     final results = await Future.wait([
       Notifier.areEnabled(),
       SystemInfo.isBatteryUnrestricted(),
@@ -367,7 +369,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             Text('任務系統'),
           ],
         ),
-        content: Text('版本 $version\n\n參考原神任務介面的待辦清單，\n未完成的任務會常駐在通知欄。',
+        content: Text('版本 $version\n\n把待辦事項變成任務清單，\n未完成的任務會常駐在通知欄。',
             style: const TextStyle(color: GColors.text, height: 1.5)),
         actions: [
           TextButton(
