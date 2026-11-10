@@ -426,6 +426,11 @@ String reminderTitle(QuestType type, QuestStep s) {
 /// 通知欄用的期限文字。通知發出後 App 不一定會再更新它，
 /// 所以用固定的截止時間（「截止 11/12（三）18:00」），不用會過時的「剩幾小時」。
 String notificationDeadlineText(QuestStep s, QuestType type, DateTime now) {
+  // 每日任務出現在通知欄時：「今天要做」，有時間的是「時間到・08:00」
+  if (type == QuestType.daily) {
+    final t = s.timeOfDay;
+    return t == null ? '今天要做' : '時間到・${timeText(t)}';
+  }
   final d = effectiveDeadline(type, s, now);
   if (d == null) return _noDeadlineText(s, type);
   final text = formatDateTime(d, withWeekday: true);

@@ -266,7 +266,8 @@ void main() {
     test('文字', () {
       expect(reminderTitle(QuestType.daily, pill(18)), '時間到：晚餐後吃藥');
       expect(reminderTitle(QuestType.daily, pill(18)..remindBefore = 10), '10 分鐘後：晚餐後吃藥');
-      expect(notificationDeadlineText(pill(18), QuestType.daily, DateTime(2026, 11, 10)), '每天 18:00');
+      expect(notificationDeadlineText(pill(18), QuestType.daily, DateTime(2026, 11, 10, 18)), '時間到・18:00');
+      expect(notificationDeadlineText(QuestStep(id: 9, title: '喝水'), QuestType.daily, DateTime(2026, 11, 10)), '今天要做');
       expect(remindOptionText(0), '準時');
       expect(remindOptionText(null), '不提醒');
       expect(timeText(9 * 60 + 5), '09:05');

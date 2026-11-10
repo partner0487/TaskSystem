@@ -257,7 +257,8 @@ class Notifier {
         // 只有倒數時才指定 when（截止時間在未來）。
         // 不要指定過去的時間：Android 會直接丟掉時間戳太舊的通知。
         showWhen: countdown,
-        when: countdown ? d.millisecondsSinceEpoch : null,
+        // 24:00 截止 = 隔天 00:00，系統會顯示成「明天的日期」；往前推 1 秒變成今天 23:59:59
+        when: countdown ? d.subtract(const Duration(seconds: 1)).millisecondsSinceEpoch : null,
         usesChronometer: countdown,
         chronometerCountDown: countdown,
         timeoutAfter: timeout?.inMilliseconds,
