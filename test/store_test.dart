@@ -1,0 +1,81 @@
+import 'dart:convert';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:task_system/models.dart';
+import 'package:task_system/store.dart';
+
+/// 假的存檔：像手機上的一樣存成 JSON 字串，每次讀取都產生全新的物件。
+class FakeStorage {
+  String json = jsonEncode(AppData(nextId: 10, quests: [
+    Quest(id: 1, title: '生病', type: QuestType.daily, steps: [QuestStep(id: 2, title: '午餐後吃藥')]),
+  ]).toJson());
+
+  /// 讓讀取變慢，模擬「回到前景重新讀取」還在進行中。
+  Duration readDelay = Duration.zero;
+
+  Future<AppData> read() async {
+    final snapshot = json;
+    await Future<void>.delayed(readDelay);
+    return AppData.fromJson(jsonDecode(snapshot) as Map<String, dynamic>);
+  }
+
+  Future<void> write(AppData d) async => json = jsonEncode(d.toJson());
+
+  AppData get saved => AppData.fromJson(jsonDecode(json) as Map<String, dynamic>);
+}
+
+void main() {
+  late FakeStorage storage;
+  late QuestStore store;
+
+  setUp(() async {
+    storage = FakeStorage();
+    store = QuestStore(read: storage.read, write: storage.write, syncNotifications: (_) async {});
+    await store.reload();
+  });
+
+  test('新增表單開著時 App 回到前景（重新讀取），按下新增仍然會存進去', () async {
+    final staleQuest = store.quests.first; // 表單打開時拿到的大事件
+    await store.reload(); // 切到別的 App / 拉下通知欄再回來
+
+    expect(identical(staleQuest, store.quests.first), isFalse); // 已經是新的物件了
+    final ok = await store.addStep(staleQuest, title: '晚餐後吃藥');
+
+    expect(ok, isTrue);
+    expect(store.quests.first.steps.map((s) => s.title), ['午餐後吃藥', '晚餐後吃藥']);
+    expect(storage.saved.quests.first.steps.map((s) => s.title), contains('晚餐後吃藥'));
+  });
+
+  test('編輯、打勾、刪除用的是舊物件，也會改到目前的資料', () async {
+    final staleStep = store.quests.first.steps.first;
+    await store.reload();
+
+    expect(await store.updateStep(staleStep, title: '午餐後吃藥（飯後 30 分）', note: '', weekdays: const []),
+        isTrue);
+    expect(storage.saved.quests.first.steps.first.title, '午餐後吃藥（飯後 30 分）');
+
+    expect(await store.toggleStep(staleStep), isTrue);
+    expect(storage.saved.quests.first.steps.first.done, isTrue);
+
+    await store.deleteStep(store.quests.first, staleStep);
+    expect(storage.saved.quests.first.steps, isEmpty);
+  });
+
+  test('重新讀取還在進行時按下新增，兩件事依序執行，不會互相蓋掉', () async {
+    final quest = store.quests.first;
+    storage.readDelay = const Duration(milliseconds: 50);
+
+    final reloading = store.reload(); // 讀取中（還沒讀完）
+    final adding = store.addStep(quest, title: '晚餐後吃藥'); // 同時按下新增
+    await Future.wait([reloading, adding]);
+
+    expect(await adding, isTrue);
+    expect(storage.saved.quests.first.steps.map((s) => s.title), contains('晚餐後吃藥'));
+  });
+
+  test('大事件已經被刪掉時，新增會回報失敗（畫面會跳出提示）', () async {
+    final quest = store.quests.first;
+    await store.deleteQuest(quest);
+    expect(await store.addStep(quest, title: '晚餐後吃藥'), isFalse);
+  });
+}

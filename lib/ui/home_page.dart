@@ -110,7 +110,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         await _addStep(q);
       case 'edit':
         final r = await showQuestSheet(context, quest: q, initialType: q.type);
-        if (r != null) await store.updateQuest(q, title: r.title, type: r.type);
+        if (r != null && !await store.updateQuest(q, title: r.title, type: r.type)) {
+          _toast('「${q.title}」已經不存在，可能被刪除了');
+        }
       case 'delete':
         if (await confirmDelete(context, q.title)) {
           await store.deleteQuest(q);
@@ -143,8 +145,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           : '「${s.title}」${nextResetLabel(next, _now)}才能打勾');
       return;
     }
-    await store.toggleStep(s);
-    if (s.done) _showUndo('已完成「${s.title}」');
+    // 用回傳值判斷（畫面上的 s 在重新讀取後可能是舊的物件）
+    if (await store.toggleStep(s) == true) _showUndo('已完成「${s.title}」');
   }
 
   /// 下方跳出「…・復原」的提示，幾秒後自動消失。
@@ -219,26 +221,31 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Future<void> _addStep(Quest q) async {
     final r = await showStepSheet(context, type: q.type);
     if (r == null) return;
-    await store.addStep(q,
+    final ok = await store.addStep(q,
         title: r.title,
         note: r.note,
         deadline: r.deadline,
         weekdays: r.weekdays,
         remindBefore: r.remindBefore,
         timeOfDay: r.timeOfDay);
+    if (!ok) {
+      _toast('「${q.title}」已經不存在，可能被刪除了');
+      return;
+    }
     _collapsed.remove(q.id);
   }
 
   Future<void> _editStep(Quest q, QuestStep s) async {
     final r = await showStepSheet(context, type: q.type, step: s);
     if (r == null) return;
-    await store.updateStep(s,
+    final ok = await store.updateStep(s,
         title: r.title,
         note: r.note,
         deadline: r.deadline,
         weekdays: r.weekdays,
         remindBefore: r.remindBefore,
         timeOfDay: r.timeOfDay);
+    if (!ok) _toast('「${s.title}」已經不存在，可能被刪除了');
   }
 
   // ---------- 畫面 ----------
