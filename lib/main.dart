@@ -38,6 +38,15 @@ Future<void> bootSync() async {
   await Notifier.refreshFromStorage();
 }
 
+/// 遊戲模式開關（快速設定）、時間到自動關閉時，原生端啟動沒有畫面的引擎執行這裡：
+/// 依照目前的遊戲模式狀態重新同步通知欄（開啟 → 清空；關閉 → 補回來）。
+@pragma('vm:entry-point')
+Future<void> syncNotificationsOnly() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  DartPluginRegistrant.ensureInitialized();
+  await Notifier.resyncFromStorage();
+}
+
 class QuestApp extends StatelessWidget {
   const QuestApp({super.key, required this.store});
 

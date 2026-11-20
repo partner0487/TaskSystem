@@ -15,6 +15,26 @@ import io.flutter.plugin.common.MethodChannel
  * 電池是否不受限制、打開 App 設定頁、讀版本號、用瀏覽器開網址。
  */
 class MainActivity : FlutterActivity() {
+    companion object {
+        /** 從快速設定開關打開 App 時，要 App 做什麼（例如跳出遊戲模式的時間選擇）。 */
+        const val EXTRA_ACTION = "task_system_action"
+        const val ACTION_GAME_MODE_PICKER = "game_mode_picker"
+    }
+
+    /** 還沒交給 Dart 的動作（Dart 打開 / 回到前景時會來拿）。 */
+    private var pendingAction: String? = null
+
+    override fun onCreate(savedInstanceState: android.os.Bundle?) {
+        super.onCreate(savedInstanceState)
+        pendingAction = intent?.getStringExtra(EXTRA_ACTION)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        intent.getStringExtra(EXTRA_ACTION)?.let { pendingAction = it }
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "task_system/system")
@@ -40,6 +60,18 @@ class MainActivity : FlutterActivity() {
                         val code = if (Build.VERSION.SDK_INT >= 28) info.longVersionCode
                         else @Suppress("DEPRECATION") info.versionCode.toLong()
                         result.success("${info.versionName} (${code})")
+                    }
+
+                    // Dart 開關遊戲模式之後：排好自動關閉的鬧鐘、更新快速設定開關
+                    "gameModeChanged" -> {
+                        GameMode.refresh(this)
+                        result.success(null)
+                    }
+
+                    // 拿走一次性的動作（例如從快速設定開關打開 → 跳出遊戲模式的時間選擇）
+                    "takeLaunchAction" -> {
+                        result.success(pendingAction)
+                        pendingAction = null
                     }
 
                     "openUrl" -> {

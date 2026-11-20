@@ -99,6 +99,9 @@ class QuestStore extends ChangeNotifier {
         } catch (_) {}
       });
 
+  /// 只重新同步通知欄（例如遊戲模式開關之後）。
+  Future<void> resync() => _serial(() => _sync(_data));
+
   /// 從自動備份還原（可以復原）。
   Future<void> restoreAutoBackup(AppData data) => importBackup(data);
 

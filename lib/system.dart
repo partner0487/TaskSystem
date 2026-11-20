@@ -16,4 +16,10 @@ class SystemInfo {
       await _channel.invokeMethod<String>('appVersion') ?? '?';
 
   static Future<void> openUrl(String url) => _channel.invokeMethod('openUrl', url);
+
+  /// 開關遊戲模式之後呼叫：原生端排好自動關閉的鬧鐘、更新快速設定開關。
+  static Future<void> gameModeChanged() => _channel.invokeMethod('gameModeChanged');
+
+  /// 拿走一次性的動作，例如從快速設定開關打開 App → 'game_mode_picker'。沒有就是 null。
+  static Future<String?> takeLaunchAction() => _channel.invokeMethod<String>('takeLaunchAction');
 }

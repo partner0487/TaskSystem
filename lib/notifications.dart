@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 
+import 'game_mode.dart';
 import 'models.dart';
 import 'storage.dart';
 
@@ -151,6 +152,15 @@ class Notifier {
     );
   }
 
+  /// 只依照存檔重新同步通知欄，不寫存檔（遊戲模式開關、時間到自動關閉時用）。
+  /// App 開著的話，順便叫它重新讀取（更新畫面上的遊戲模式提示）。
+  static Future<void> resyncFromStorage() async {
+    final data = await Storage.read();
+    data.applyResets(DateTime.now()); // 只影響這次要顯示的內容，不寫回存檔
+    await sync(data);
+    IsolateNameServer.lookupPortByName(_uiPortName)?.send('changed');
+  }
+
   /// 讀存檔 → 套用每日重置 →（可選）完成某個細項 → 存檔 → 同步通知欄。
   /// 通知欄事件和開機補發都走這條路。
   static Future<void> refreshFromStorage({int? completeStepId, int? abandonStepId}) async {
@@ -175,6 +185,14 @@ class Notifier {
     }
 
     final now = DateTime.now();
+
+    // 遊戲模式中：通知欄清空、提醒和預約全部取消。關閉時會再同步一次，全部補回來。
+    if (await GameMode.isActive(now)) {
+      await plugin.cancelAll();
+      await plugin.cancelAllPendingNotifications();
+      return;
+    }
+
     final keepActive = <int>{};
     final keepPending = <int>{};
     final resets = <(Quest, QuestStep, DateTime)>[];

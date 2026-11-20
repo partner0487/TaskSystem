@@ -43,6 +43,24 @@
         <receiver
             android:exported="false"
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
+        <!-- 快速設定裡的「遊戲模式」開關（見 GameModeTileService.kt） -->
+        <service
+            android:name=".GameModeTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_game_mode"
+            android:label="遊戲模式"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.service.quicksettings.TOGGLEABLE_TILE"
+                android:value="true"/>
+        </service>
+        <!-- 遊戲模式時間到自動關閉（見 GameModeReceiver.kt） -->
+        <receiver
+            android:exported="false"
+            android:name=".GameModeReceiver" />
         <!-- 開機 / App 更新後補回通知（見 BootReceiver.kt） -->
         <receiver
             android:exported="false"

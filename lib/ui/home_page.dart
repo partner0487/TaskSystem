@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../auto_backup.dart';
 import '../backup.dart';
 import '../demo.dart';
+import '../game_mode.dart';
 import '../models.dart';
 import '../notifications.dart';
 import '../storage.dart';
@@ -60,13 +61,19 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _checkSetup();
+    _checkGameMode();
+    store.addListener(_checkGameMode); // 背景改了遊戲模式（快速設定、時間到）→ App 重新讀取時更新提示
+    WidgetsBinding.instance.addPostFrameCallback((_) => _handleLaunchAction());
     // 倒數文字的更新：有任務剩不到 1 小時（顯示到秒）就每秒重畫，
     // 否則每分鐘重畫一次就夠了（比較省電）。換分鐘時順便檢查是否跨過每日重置時間。
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       final now = DateTime.now();
       final newMinute = now.minute != _now.minute;
       if (newMinute || _showsSeconds(now)) setState(() => _now = now);
-      if (newMinute) store.checkDailyReset();
+      if (newMinute) {
+        store.checkDailyReset();
+        _checkGameMode(); // 遊戲模式時間到 → 提示消失
+      }
     });
   }
 
@@ -82,6 +89,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    store.removeListener(_checkGameMode);
     _ticker.cancel();
     super.dispose();
   }
@@ -93,7 +101,74 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       _now = DateTime.now();
       store.reload();
       _checkSetup();
+      _checkGameMode();
+      _handleLaunchAction();
     }
+  }
+
+  // ---------- 遊戲模式 ----------
+
+  /// 目前的遊戲模式（null = 沒開；until == null = 直到手動關閉）
+  ({DateTime? until})? _gameMode;
+
+  Future<void> _checkGameMode() async {
+    if (demoMode) return;
+    final g = await GameMode.read();
+    if (mounted && g != _gameMode) setState(() => _gameMode = g);
+  }
+
+  /// 從快速設定的「遊戲模式」打開 App 時，跳出時間選擇。
+  Future<void> _handleLaunchAction() async {
+    if (demoMode) return;
+    final action = await SystemInfo.takeLaunchAction();
+    if (action == 'game_mode_picker' && mounted) await _pickGameMode();
+  }
+
+  Future<void> _pickGameMode() async {
+    final picked = await showDialog<({Duration? d})>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        backgroundColor: GColors.header,
+        title: const Text('遊戲模式'),
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(24, 0, 24, 8),
+            child: Text('暫時清空通知欄、停掉所有提醒。要開多久？',
+                style: TextStyle(color: GColors.sub, fontSize: 13)),
+          ),
+          for (final d in gameModeDurations)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(ctx, (d: d)),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Text(gameModeDurationText(d), style: const TextStyle(fontSize: 16)),
+              ),
+            ),
+        ],
+      ),
+    );
+    if (picked == null) return;
+    await GameMode.turnOn(picked.d);
+    await _afterGameModeChanged();
+    final g = _gameMode;
+    _toast(g == null
+        ? '遊戲模式已開啟'
+        : g.until == null
+            ? '遊戲模式已開啟，直到手動關閉'
+            : '遊戲模式已開啟，到 ${timeText(g.until!.hour * 60 + g.until!.minute)} 自動關閉');
+  }
+
+  Future<void> _turnOffGameMode() async {
+    await GameMode.turnOff();
+    await _afterGameModeChanged();
+    _toast('遊戲模式已關閉，任務回到通知欄');
+  }
+
+  /// 開關之後：原生端排鬧鐘 / 更新快速設定開關、通知欄重新同步、畫面提示更新。
+  Future<void> _afterGameModeChanged() async {
+    await SystemInfo.gameModeChanged();
+    await store.resync();
+    await _checkGameMode();
   }
 
   // ---------- 動作 ----------
@@ -365,11 +440,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               'export' => _export(),
               'import' => _import(),
               'battery' => SystemInfo.openAppSettings(),
+              'game' => _gameMode == null ? _pickGameMode() : _turnOffGameMode(),
               'restore' => _restoreAutoBackup(),
               'clear' => _clearCompleted(),
               _ => _showAbout(),
             },
-            itemBuilder: (_) => const [
+            itemBuilder: (_) => [
               PopupMenuItem(
                 value: 'export',
                 child: ListTile(leading: Icon(Icons.upload_file), title: Text('匯出備份')),
@@ -388,6 +464,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
               PopupMenuDivider(),
               PopupMenuItem(
+                value: 'game',
+                child: ListTile(
+                  leading: const Icon(Icons.sports_esports_outlined),
+                  title: Text(_gameMode == null ? '遊戲模式' : '關閉遊戲模式'),
+                ),
+              ),
+              const PopupMenuItem(
                 value: 'battery',
                 child: ListTile(leading: Icon(Icons.battery_charging_full), title: Text('背景執行設定')),
               ),
@@ -404,6 +487,19 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   /// 頂端的設定提示：通知沒開（最重要，不能關掉）> 電池有限制（可以「不再提醒」）。
   Widget _buildSetupBanner() {
+    final g = _gameMode;
+    if (g != null) {
+      final until = g.until;
+      return _Banner(
+        color: const Color(0xFFA48BE8),
+        icon: Icons.sports_esports_outlined,
+        text: until == null
+            ? '遊戲模式中・直到手動關閉\n任務通知和提醒已暫停'
+            : '遊戲模式中・到 ${timeText(until.hour * 60 + until.minute)}\n任務通知和提醒已暫停',
+        action: '關閉',
+        onAction: _turnOffGameMode,
+      );
+    }
     if (!_notificationsOn) {
       return _Banner(
         color: GColors.overdue,

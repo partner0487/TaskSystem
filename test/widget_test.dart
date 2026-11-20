@@ -2,9 +2,15 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:task_system/backup.dart';
+import 'package:task_system/game_mode.dart';
 import 'package:task_system/models.dart';
 
 void main() {
+  test('遊戲模式的時間選項文字', () {
+    expect(gameModeDurations.map(gameModeDurationText),
+        ['30 分鐘', '1 小時', '2 小時', '直到手動關閉']);
+  });
+
   group('備份', () {
     test('匯出再匯入，內容完全一樣', () {
       final data = AppData.sample();
