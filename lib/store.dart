@@ -42,7 +42,7 @@ class QuestStore extends ChangeNotifier {
     return quests
         .where((q) => q.type == type)
         .expand((q) => q.steps)
-        .where((s) => !s.done && isActiveOn(type, s, now))
+        .where((s) => !s.closed && isActiveOn(type, s, now))
         .length;
   }
 
@@ -186,12 +186,12 @@ class QuestStore extends ChangeNotifier {
   Future<int> clearCompleted() => _serial(() async {
         var count = 0;
         final targets = quests.where((q) => !q.type.recurring).toList();
-        if (!targets.any((q) => q.steps.any((s) => s.done))) return 0;
+        if (!targets.any((q) => q.steps.any((s) => s.closed))) return 0;
         _snapshot();
         for (final q in targets) {
           final hadSteps = q.steps.isNotEmpty;
-          count += q.steps.where((s) => s.done).length;
-          q.steps.removeWhere((s) => s.done);
+          count += q.steps.where((s) => s.closed).length;
+          q.steps.removeWhere((s) => s.closed);
           if (hadSteps && q.steps.isEmpty) quests.remove(q);
         }
         await _commit();
@@ -290,8 +290,29 @@ class QuestStore extends ChangeNotifier {
         final found = _step(step.id);
         if (found == null) return null;
         _snapshot();
-        final s = found.$2..done = !found.$2.done;
+        final s = found.$2;
+        if (s.abandoned) {
+          // 已放棄的按 ✓ → 改成完成
+          s
+            ..abandoned = false
+            ..done = true;
+        } else {
+          s.done = !s.done;
+        }
         await _commit();
         return s.done;
+      });
+
+  /// 放棄 / 取消放棄。回傳之後的狀態（true = 已放棄）；細項不存在時回傳 null。
+  Future<bool?> toggleAbandon(QuestStep step) => _serial(() async {
+        final found = _step(step.id);
+        if (found == null) return null;
+        _snapshot();
+        final s = found.$2;
+        s
+          ..abandoned = !s.abandoned
+          ..done = false;
+        await _commit();
+        return s.abandoned;
       });
 }

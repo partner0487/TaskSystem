@@ -41,6 +41,7 @@ class QuestStep {
     this.remindBefore,
     this.timeOfDay,
     this.tracked = true,
+    this.abandoned = false,
   }) : weekdays = weekdays ?? [];
 
   final int id;
@@ -48,6 +49,12 @@ class QuestStep {
   String note;
   DateTime? deadline; // null 表示沒有時間限制
   bool done;
+
+  /// 放棄了（例如錯過的任務）。每日 / 每週任務只放棄這一次，下次重置時會重新出現。
+  bool abandoned;
+
+  /// 已結束 = 完成或放棄：不放通知欄、不提醒、排到已完成那一區。
+  bool get closed => done || abandoned;
 
   /// 每週任務在星期幾重置（1 = 週一 … 7 = 週日）。空的 = 每週一重置一次。
   List<int> weekdays;
@@ -83,6 +90,7 @@ class QuestStep {
         'remindBefore': remindBefore,
         'timeOfDay': timeOfDay,
         'tracked': tracked,
+        'abandoned': abandoned,
       };
 
   factory QuestStep.fromJson(Map<String, dynamic> j) => QuestStep(
@@ -97,6 +105,7 @@ class QuestStep {
         remindBefore: j['remindBefore'] as int?,
         timeOfDay: j['timeOfDay'] as int?,
         tracked: (j['tracked'] as bool?) ?? true, // 舊存檔沒有這個欄位 = 追蹤中
+        abandoned: (j['abandoned'] as bool?) ?? false,
       );
 }
 
@@ -117,7 +126,7 @@ class Quest {
   /// 底下的細項全部都在追蹤（大事件的 📌 顯示實心）。沒有細項時也算 true。
   bool get allTracked => steps.every((s) => s.tracked);
 
-  bool get done => steps.isNotEmpty && steps.every((s) => s.done);
+  bool get done => steps.isNotEmpty && steps.every((s) => s.closed);
   int get doneCount => steps.where((s) => s.done).length;
 
   Map<String, dynamic> toJson() => {
@@ -183,7 +192,9 @@ class AppData {
               q.type == QuestType.weekly && s.weekdays.isNotEmpty;
           if (perDay && passed.isNotEmpty ||
               q.type == QuestType.weekly && s.resetWeekdays.any(passed.contains)) {
-            s.done = false;
+            s
+              ..done = false
+              ..abandoned = false;
           }
         }
       }
@@ -283,9 +294,9 @@ bool isActiveOn(QuestType type, QuestStep s, DateTime now) {
 List<QuestStep> displaySteps(QuestType type, List<QuestStep> steps, DateTime now) {
   bool active(QuestStep s) => isActiveOn(type, s, now);
   return [
-    ...steps.where((s) => !s.done && active(s)),
-    ...steps.where((s) => !s.done && !active(s)),
-    ...steps.where((s) => s.done),
+    ...steps.where((s) => !s.closed && active(s)),
+    ...steps.where((s) => !s.closed && !active(s)),
+    ...steps.where((s) => s.closed),
   ];
 }
 
@@ -294,7 +305,7 @@ String questProgress(QuestType type, Quest q, DateTime now) {
   if (q.done) return '已完成';
   final active = q.steps.where((s) => isActiveOn(type, s, now)).toList();
   if (q.steps.isNotEmpty && active.isEmpty) return '休息中';
-  return '${active.where((s) => s.done).length}/${active.length}';
+  return '${active.where((s) => s.closed).length}/${active.length}';
 }
 
 /// 下一次震動提醒的時間（沒有就回傳 null）：
@@ -308,13 +319,13 @@ DateTime? nextReminderTime(QuestType type, QuestStep s, DateTime now) {
   if (m == null) return null;
   if (!type.recurring) {
     final at = s.remindAt;
-    return !s.done && at != null && at.isAfter(now) ? at : null;
+    return !s.closed && at != null && at.isAfter(now) ? at : null;
   }
   if (type == QuestType.daily) {
     if (s.timeOfDay == null) return null;
     final day = gameDay(now);
     final today = dailyTimeOn(s, day)!.subtract(Duration(minutes: m));
-    if (!s.done && today.isAfter(now)) return today;
+    if (!s.closed && today.isAfter(now)) return today;
     return dailyTimeOn(s, DateTime(day.year, day.month, day.day + 1))!
         .subtract(Duration(minutes: m));
   }
@@ -323,7 +334,7 @@ DateTime? nextReminderTime(QuestType type, QuestStep s, DateTime now) {
       effectiveDeadline(type, s, when)?.subtract(Duration(minutes: m));
 
   // 這一次（今天輪到、還沒做）
-  if (!s.done && isActiveOn(type, s, now)) {
+  if (!s.closed && isActiveOn(type, s, now)) {
     final at = remindFor(now);
     if (at != null && at.isAfter(now)) return at;
   }
@@ -337,7 +348,7 @@ DateTime? nextReminderTime(QuestType type, QuestStep s, DateTime now) {
 /// 現在要不要出現在通知欄。
 bool showsInNotificationBar(Quest q, QuestStep s, DateTime now) =>
     s.tracked &&
-    !s.done &&
+    !s.closed &&
     isActiveOn(q.type, s, now) &&
     !beforeDailyTime(q.type, s, now) &&
     !isStale(q.type, s, now);
@@ -391,7 +402,7 @@ DateTime? nextResetFor(QuestType type, QuestStep s, DateTime now) {
       if (s.timeOfDay == null) return first;
       final day = gameDay(now);
       final today = dailyTimeOn(s, day)!;
-      if (!s.done && today.isAfter(now)) return today;
+      if (!s.closed && today.isAfter(now)) return today;
       return dailyTimeOn(s, DateTime(day.year, day.month, day.day + 1));
     case QuestType.weekly:
       for (var i = 0; i < 7; i++) {

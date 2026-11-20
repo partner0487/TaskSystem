@@ -120,6 +120,73 @@ void main() {
     });
   });
 
+  group('放棄', () {
+    final noon = DateTime(2026, 11, 20, 12);
+
+    test('放棄後不出現在通知欄、不提醒，可以復原', () async {
+      final s = store.quests.first.steps.first;
+      expect(await store.toggleAbandon(s), isTrue);
+      final now = store.quests.first.steps.first;
+      expect(now.abandoned, isTrue);
+      expect(now.closed, isTrue);
+      expect(showsInNotificationBar(store.quests.first, now, noon), isFalse);
+
+      await store.undo();
+      expect(store.quests.first.steps.first.abandoned, isFalse);
+    });
+
+    test('取消放棄 → 回到未完成；已放棄的按 ✓ → 改成完成', () async {
+      final s = store.quests.first.steps.first;
+      await store.toggleAbandon(s);
+      expect(await store.toggleAbandon(s), isFalse);
+      expect(store.quests.first.steps.first.closed, isFalse);
+
+      await store.toggleAbandon(s);
+      expect(await store.toggleStep(s), isTrue);
+      final after = store.quests.first.steps.first;
+      expect([after.done, after.abandoned], [true, false]);
+    });
+
+    test('每日任務只放棄這一次：跨過凌晨 4 點就重新出現', () {
+      final data = AppData(nextId: 10, lastReset: '2026-11-19', quests: [
+        Quest(id: 1, title: '生病', type: QuestType.daily,
+            steps: [QuestStep(id: 2, title: '吃藥', abandoned: true)]),
+      ]);
+      data.applyResets(DateTime(2026, 11, 20, 8));
+      expect(data.quests.first.steps.first.abandoned, isFalse);
+    });
+
+    test('有放棄的細項時，提醒不再排', () {
+      final s = QuestStep(
+          id: 1, title: '報告', deadline: DateTime(2026, 11, 21, 18), remindBefore: 60, abandoned: true);
+      expect(nextReminderTime(QuestType.main, s, noon), isNull);
+    });
+
+    test('清除已完成也會清掉已放棄的主線 / 支線', () async {
+      storage.json = jsonEncode(AppData(nextId: 10, quests: [
+        Quest(id: 1, title: '專題', type: QuestType.main, steps: [
+          QuestStep(id: 2, title: '放棄的', abandoned: true),
+          QuestStep(id: 3, title: '還要做的'),
+        ]),
+      ]).toJson());
+      await store.reload();
+      expect(await store.clearCompleted(), 1);
+      expect(store.quests.first.steps.map((s) => s.title), ['還要做的']);
+    });
+
+    test('全部完成或放棄 = 大事件已完成', () {
+      final q = Quest(id: 1, title: 'x', type: QuestType.main, steps: [
+        QuestStep(id: 2, title: 'a', done: true),
+        QuestStep(id: 3, title: 'b', abandoned: true),
+      ]);
+      expect(q.done, isTrue);
+    });
+  });
+
+  test('舊存檔沒有放棄欄位 = 沒放棄', () {
+    expect(QuestStep.fromJson({'id': 1, 'title': 's'}).abandoned, isFalse);
+  });
+
   test('舊存檔沒有追蹤欄位 = 追蹤中', () {
     final q = Quest.fromJson({
       'id': 1, 'title': '舊', 'type': 'main',

@@ -71,7 +71,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   /// 目前有沒有任務剩不到 1 小時（倒數會顯示秒數）。
   bool _showsSeconds(DateTime now) => store.quests.any((q) => q.steps.any((s) {
-        if (s.done) return false;
+        if (s.closed) return false;
         final d = countdownTarget(q.type, s, now);
         if (d == null) return false;
         final left = d.difference(now);
@@ -147,6 +147,22 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
     // 用回傳值判斷（畫面上的 s 在重新讀取後可能是舊的物件）
     if (await store.toggleStep(s) == true) _showUndo('已完成「${s.title}」');
+  }
+
+  // ---------- 放棄 ----------
+
+  Future<void> _toggleAbandon(Quest q, QuestStep s) async {
+    // 還沒輪到的每週任務（例如週一的「週六日籃球」）沒有東西可以放棄
+    if (!s.abandoned && !isActiveOn(q.type, s, _now)) {
+      _toast('「${s.title}」還沒輪到，不用放棄');
+      return;
+    }
+    final abandoned = await store.toggleAbandon(s);
+    if (abandoned == true) {
+      _showUndo(q.type.recurring ? '已放棄「${s.title}」這一次' : '已放棄「${s.title}」');
+    } else if (abandoned == false) {
+      _toast('已取消放棄「${s.title}」');
+    }
   }
 
   // ---------- 追蹤 ----------
@@ -575,6 +591,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         onEdit: () => _editStep(q, s),
         onToggle: () => _toggleStep(q, s),
         onToggleTrack: () => _toggleStepTracked(s),
+        onAbandon: () => _toggleAbandon(q, s),
       ),
     );
   }

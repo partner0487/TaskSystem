@@ -14,6 +14,7 @@ import 'storage.dart';
 const _channelId = 'quest_list';
 const _channelName = '待辦任務';
 const _actionComplete = 'complete';
+const _actionAbandon = 'abandon';
 const _uiPortName = 'quest_ui_port';
 
 /// 每日任務「凌晨 4 點重新出現」的預約通知，id 用 細項 id + 這個偏移量，
@@ -80,22 +81,36 @@ class Notifier {
     final type = r.notificationResponseType;
     final complete = type == NotificationResponseType.selectedNotificationAction &&
         r.actionId == _actionComplete;
+    final abandon = type == NotificationResponseType.selectedNotificationAction &&
+        r.actionId == _actionAbandon;
     final dismissed = type == NotificationResponseType.notificationDismissed;
-    if (!complete && !dismissed) return;
+    if (!complete && !abandon && !dismissed) return;
 
     // payload 一定是細項 id（預約重置的通知 id 有加偏移量，不能直接用）
     final stepId = int.tryParse(r.payload ?? '') ?? r.id;
-    await refreshFromStorage(completeStepId: complete ? stepId : null);
+    await refreshFromStorage(
+      completeStepId: complete ? stepId : null,
+      abandonStepId: abandon ? stepId : null,
+    );
   }
 
   /// 讀存檔 → 套用每日重置 →（可選）完成某個細項 → 存檔 → 同步通知欄。
   /// 通知欄事件和開機補發都走這條路。
-  static Future<void> refreshFromStorage({int? completeStepId}) async {
+  static Future<void> refreshFromStorage({int? completeStepId, int? abandonStepId}) async {
     final data = await Storage.read();
     data.applyResets(DateTime.now());
     if (completeStepId != null) {
       for (final s in data.quests.expand((q) => q.steps)) {
-        if (s.id == completeStepId) s.done = true;
+        if (s.id == completeStepId) {
+          s
+            ..done = true
+            ..abandoned = false;
+        }
+        if (s.id == abandonStepId) {
+          s
+            ..abandoned = true
+            ..done = false;
+        }
       }
     }
     await Storage.write(data);
@@ -128,7 +143,7 @@ class Notifier {
         if (!s.tracked) continue;
 
         // 到期前的震動提醒（主線 / 支線 / 每週）
-        if (!s.done) keepActive.add(_reminderIdOffset + s.id); // 已經跳出的提醒留著，等使用者自己處理
+        if (!s.closed) keepActive.add(_reminderIdOffset + s.id); // 已經跳出的提醒留著，等使用者自己處理
         final remindAt = nextReminderTime(q.type, s, now);
         if (remindAt != null) {
           keepPending.add(_reminderIdOffset + s.id);
@@ -218,16 +233,26 @@ class Notifier {
           subText: '${q.type.label}・${q.title}',
           color: const Color(0xFFD3BC8E),
           category: AndroidNotificationCategory.reminder,
-          actions: const [
-            AndroidNotificationAction(
-              _actionComplete,
-              '✓ 完成',
-              cancelNotification: true,
-              showsUserInterface: false,
-            ),
-          ],
+          actions: _actions,
         ),
       );
+
+  /// 通知上的按鈕：「✓ 完成」「✕ 放棄」（App 沒開也能按）。
+  static const _actions = [
+    AndroidNotificationAction(
+      _actionComplete,
+      '✓ 完成',
+      cancelNotification: true,
+      showsUserInterface: false,
+    ),
+    AndroidNotificationAction(
+      _actionAbandon,
+      '✕ 放棄',
+      titleColor: Color(0xFFE07A6B),
+      cancelNotification: true,
+      showsUserInterface: false,
+    ),
+  ];
 
   static String _body(Quest q, QuestStep s, DateTime now) => [
         notificationDeadlineText(s, q.type, now),
@@ -269,14 +294,7 @@ class Notifier {
         subText: '${q.type.label}・${q.title}',
         color: const Color(0xFFD3BC8E),
         category: AndroidNotificationCategory.reminder,
-        actions: const [
-          AndroidNotificationAction(
-            _actionComplete,
-            '✓ 完成',
-            cancelNotification: true,
-            showsUserInterface: false,
-          ),
-        ],
+        actions: _actions,
       ),
     );
   }

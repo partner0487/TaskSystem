@@ -145,6 +145,7 @@ class StepCard extends StatelessWidget {
     required this.onEdit,
     required this.onToggle,
     required this.onToggleTrack,
+    required this.onAbandon,
   });
 
   final QuestStep step;
@@ -157,17 +158,21 @@ class StepCard extends StatelessWidget {
 
   final VoidCallback onToggleTrack;
 
+  /// 放棄 / 取消放棄
+  final VoidCallback onAbandon;
+
   /// 追蹤中才會出現在通知欄
   bool get _tracked => step.tracked;
 
   /// 今天不是它的日子（例如週一的「週六日籃球」）
   bool get _resting => !isActiveOn(type, step, now);
 
-  /// 選中卡片裡的小按鈕（[onPressed] 為 null = 停用）
-  Widget _cardButton(IconData icon, String label, VoidCallback? onPressed) => TextButton.icon(
+  /// 選中卡片裡的小按鈕（[onPressed] 為 null = 停用；[color] 預設深色字）
+  Widget _cardButton(IconData icon, String label, VoidCallback? onPressed, {Color? color}) =>
+      TextButton.icon(
         onPressed: onPressed,
         style: TextButton.styleFrom(
-          foregroundColor: GColors.textDark,
+          foregroundColor: color ?? GColors.textDark,
           disabledForegroundColor: GColors.textDark.withValues(alpha: 0.4),
           padding: EdgeInsets.zero,
           visualDensity: VisualDensity.compact,
@@ -181,7 +186,7 @@ class StepCard extends StatelessWidget {
 
   /// 有時間的每日任務，時間到了還沒做
   bool get _timeUp =>
-      type == QuestType.daily && step.timeOfDay != null && !step.done && !_beforeTime;
+      type == QuestType.daily && step.timeOfDay != null && !step.closed && !_beforeTime;
 
   /// 有設震動提醒（主線 / 支線要有期限才算；每週用自動期限；每日要有固定時間）
   bool get _hasReminder =>
@@ -194,6 +199,7 @@ class StepCard extends StatelessWidget {
   String _subtitle() {
     final next = nextResetFor(type, step, now);
     if (step.done) return next == null ? '已完成' : '已完成・${nextResetLabel(next, now)}重新出現';
+    if (step.abandoned) return next == null ? '已放棄' : '已放棄・${nextResetLabel(next, now)}重新出現';
     if (_resting && next != null) {
       // 今天是它的日子但已過晚上 12 點 → 本次已結束；否則是還沒輪到
       final todayDeadline = effectiveDeadline(type, step, now);
@@ -216,21 +222,23 @@ class StepCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 已完成、今天休息、或時間還沒到：顏色變淡
-    final dim = step.done || _resting || _beforeTime;
+    // 已完成 / 已放棄、今天休息、或時間還沒到：顏色變淡
+    final dim = step.closed || _resting || _beforeTime;
     final deadline = effectiveDeadline(type, step, now); // 每週任務會自動有期限
     // 只有主線 / 支線會「已逾期」；每週過了 12 點是「本次已結束」
-    final overdue = !step.done && !type.recurring && deadline != null && deadline.isBefore(now);
+    final overdue =
+        !step.closed && !type.recurring && deadline != null && deadline.isBefore(now);
     // 24 小時內到期（還沒逾期）
     // 或是有時間的每日任務已經「時間到」→ 也用藍色條提醒
     final urgent = _timeUp ||
-        !step.done &&
+        !step.closed &&
             !_resting &&
             !overdue &&
             deadline != null &&
             deadline.difference(now) < const Duration(hours: 24);
     final titleColor = selected ? GColors.textDark : (dim ? GColors.sub : GColors.text);
-    final subColor = overdue
+    // 已逾期、已放棄：紅字
+    final subColor = overdue || step.abandoned
         ? GColors.overdue
         : (selected ? GColors.textDark.withValues(alpha: 0.75) : GColors.sub);
 
@@ -283,7 +291,7 @@ class StepCard extends StatelessWidget {
                                 color: titleColor,
                                 fontSize: 17,
                                 fontWeight: FontWeight.w600,
-                                decoration: step.done ? TextDecoration.lineThrough : null,
+                                decoration: step.closed ? TextDecoration.lineThrough : null,
                                 decorationColor: titleColor,
                               ),
                             ),
@@ -297,10 +305,10 @@ class StepCard extends StatelessWidget {
                                   ),
                                 ),
                                 // 沒追蹤：🔕（不在通知欄、不提醒），取代震動圖示
-                                if (!step.done && !_tracked) ...[
+                                if (!step.closed && !_tracked) ...[
                                   const SizedBox(width: 6),
                                   Icon(Icons.notifications_off_outlined, size: 14, color: subColor),
-                                ] else if (!step.done && _hasReminder) ...[
+                                ] else if (!step.closed && _hasReminder) ...[
                                   const SizedBox(width: 6),
                                   Icon(Icons.vibration, size: 14, color: subColor),
                                 ],
@@ -313,16 +321,23 @@ class StepCard extends StatelessWidget {
                                 style: const TextStyle(color: GColors.textDark, fontSize: 14),
                               ),
                             ],
-                            // 選中時才出現的「編輯」和「追蹤」（長按是拖曳排序）
+                            // 選中時才出現的「編輯」「追蹤」「放棄」（長按是拖曳排序）
                             if (selected)
-                              Row(
+                              Wrap(
+                                spacing: 16,
                                 children: [
                                   _cardButton(Icons.edit_outlined, '編輯', onEdit),
-                                  const SizedBox(width: 16),
                                   if (step.tracked)
                                     _cardButton(Icons.push_pin, '取消追蹤', onToggleTrack)
                                   else
                                     _cardButton(Icons.push_pin_outlined, '追蹤', onToggleTrack),
+                                  // 已完成的不用放棄；紅字標記
+                                  if (step.abandoned)
+                                    _cardButton(Icons.undo, '取消放棄', onAbandon,
+                                        color: GColors.overdue)
+                                  else if (!step.done)
+                                    _cardButton(Icons.block, '放棄', onAbandon,
+                                        color: GColors.overdue),
                                 ],
                               ),
                           ],
@@ -332,6 +347,7 @@ class StepCard extends StatelessWidget {
                     Center(
                       child: CheckButton(
                         done: step.done,
+                        abandoned: step.abandoned,
                         selected: selected,
                         locked: _resting,
                         onTap: onToggle,
@@ -357,9 +373,13 @@ class CheckButton extends StatelessWidget {
     required this.selected,
     required this.onTap,
     this.locked = false,
+    this.abandoned = false,
   });
 
   final bool done;
+
+  /// 已放棄：紅色 ✕（再按一下會改成完成）
+  final bool abandoned;
   final bool selected;
   final VoidCallback onTap;
 
@@ -368,7 +388,9 @@ class CheckButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ring = locked
+    final ring = abandoned
+        ? GColors.overdue.withValues(alpha: 0.7)
+        : locked
         ? GColors.sub.withValues(alpha: 0.35)
         : selected
             ? GColors.gold
@@ -388,9 +410,11 @@ class CheckButton extends StatelessWidget {
           border: Border.all(color: ring, width: 1.5),
         ),
         child: Icon(
-          Icons.check,
+          abandoned ? Icons.close : Icons.check,
           size: 22,
-          color: done ? GColors.textDark : ring.withValues(alpha: 0.5),
+          color: abandoned
+              ? GColors.overdue
+              : (done ? GColors.textDark : ring.withValues(alpha: 0.5)),
         ),
       ),
     );
