@@ -37,6 +37,21 @@ Future<void> onBackgroundNotificationResponse(NotificationResponse r) async {
   await Notifier.handleResponse(r);
 }
 
+/// 套用通知欄的「完成」或「放棄」到資料上（背景和 App 共用，避免兩份邏輯不一致）。
+void applyNotificationAction(AppData data, {int? completeStepId, int? abandonStepId}) {
+  for (final s in data.quests.expand((q) => q.steps)) {
+    if (s.id == completeStepId) {
+      s
+        ..done = true
+        ..abandoned = false;
+    } else if (s.id == abandonStepId) {
+      s
+        ..abandoned = true
+        ..done = false;
+    }
+  }
+}
+
 /// 通知欄相關的一切：每個未完成的細項 = 一則常駐通知。
 class Notifier {
   static final plugin = FlutterLocalNotificationsPlugin();
@@ -46,8 +61,13 @@ class Notifier {
       plugin.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
 
-  /// [onDataChanged]：背景改了資料（在通知欄按了完成等）時，叫畫面重新讀取。
-  static Future<void> init({required Future<void> Function() onDataChanged}) async {
+  /// [onDataChanged]：背景改了資料時，叫畫面重新讀取。
+  /// [onAction]：App 開著時，通知欄的「完成」「放棄」「滑掉」轉交給 App 處理
+  /// （由 App 依序修改資料，避免背景和 App 同時寫存檔互相蓋掉）。
+  static Future<void> init({
+    required Future<void> Function() onDataChanged,
+    required Future<void> Function(String action, int stepId) onAction,
+  }) async {
     await plugin.initialize(
       settings: const InitializationSettings(
         android: AndroidInitializationSettings('ic_stat_quest'),
@@ -56,10 +76,39 @@ class Notifier {
       onDidReceiveBackgroundNotificationResponse: onBackgroundNotificationResponse,
     );
 
-    // 背景 isolate 改完資料後會傳訊息過來，這邊收到就重新讀取
+    // 背景 isolate 傳來的訊息：
+    // - [動作, 細項 id, 回覆用的 port] → 由 App 處理，處理完回覆，背景就不用自己寫存檔
+    // - 其它 → 背景已經改好存檔，重新讀取
     IsolateNameServer.removePortNameMapping(_uiPortName);
     IsolateNameServer.registerPortWithName(_uiPort.sendPort, _uiPortName);
-    _uiPort.listen((_) => onDataChanged());
+    _uiPort.listen((msg) async {
+      if (msg is List && msg.length == 3 && msg[2] is SendPort) {
+        await onAction(msg[0] as String, msg[1] as int);
+        (msg[2] as SendPort).send(true);
+      } else {
+        await onDataChanged();
+      }
+    });
+  }
+
+  static const actionComplete = _actionComplete;
+  static const actionAbandon = _actionAbandon;
+  static const actionDismissed = 'dismissed';
+
+  /// App 開著的話，把動作交給 App 處理。2 秒內有回覆 = App 處理好了。
+  static Future<bool> _handOverToApp(String action, int stepId) async {
+    final app = IsolateNameServer.lookupPortByName(_uiPortName);
+    if (app == null) return false;
+    final reply = ReceivePort();
+    try {
+      app.send([action, stepId, reply.sendPort]);
+      await reply.first.timeout(const Duration(seconds: 2));
+      return true;
+    } catch (_) {
+      return false; // App 已經關了（port 失效）→ 背景自己處理
+    } finally {
+      reply.close();
+    }
   }
 
   /// Android 13 以上要跳出視窗詢問使用者是否允許通知。
@@ -87,7 +136,15 @@ class Notifier {
     if (!complete && !abandon && !dismissed) return;
 
     // payload 一定是細項 id（預約重置的通知 id 有加偏移量，不能直接用）
-    final stepId = int.tryParse(r.payload ?? '') ?? r.id;
+    final stepId = int.tryParse(r.payload ?? '') ?? r.id ?? -1;
+    final action = complete
+        ? _actionComplete
+        : abandon
+            ? _actionAbandon
+            : actionDismissed;
+
+    // App 開著 → 交給 App；App 沒開 → 背景自己讀寫存檔
+    if (await _handOverToApp(action, stepId)) return;
     await refreshFromStorage(
       completeStepId: complete ? stepId : null,
       abandonStepId: abandon ? stepId : null,
@@ -99,20 +156,7 @@ class Notifier {
   static Future<void> refreshFromStorage({int? completeStepId, int? abandonStepId}) async {
     final data = await Storage.read();
     data.applyResets(DateTime.now());
-    if (completeStepId != null) {
-      for (final s in data.quests.expand((q) => q.steps)) {
-        if (s.id == completeStepId) {
-          s
-            ..done = true
-            ..abandoned = false;
-        }
-        if (s.id == abandonStepId) {
-          s
-            ..abandoned = true
-            ..done = false;
-        }
-      }
-    }
+    applyNotificationAction(data, completeStepId: completeStepId, abandonStepId: abandonStepId);
     await Storage.write(data);
     await sync(data);
 

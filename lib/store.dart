@@ -78,11 +78,26 @@ class QuestStore extends ChangeNotifier {
   }
 
   /// 從存檔重新讀取（App 啟動、回到前景、通知欄按了完成之後都會呼叫）。
+  /// 只有真的有變動（跨過凌晨 4 點重置）才寫回存檔：
+  /// 不然剛讀到的舊資料寫回去，可能會蓋掉背景同時寫入的修改。
   Future<void> reload() => _serial(() async {
         _data = await _read();
-        _data.applyResets(DateTime.now());
+        final changed = _data.applyResets(DateTime.now());
         loaded = true;
-        await _commit();
+        notifyListeners();
+        if (changed) await _write(_data);
+        await _sync(_data);
+      });
+
+  /// App 開著時，通知欄的「完成」「放棄」「滑掉」由背景轉交到這裡，跟其它修改一起依序處理。
+  Future<void> handleNotificationAction(String action, int stepId) => _serial(() async {
+        _data.applyResets(DateTime.now());
+        applyNotificationAction(
+          _data,
+          completeStepId: action == Notifier.actionComplete ? stepId : null,
+          abandonStepId: action == Notifier.actionAbandon ? stepId : null,
+        );
+        await _commit(); // 「滑掉」也會同步，被滑掉的通知就補回來
       });
 
   /// App 開著的時候定時檢查，跨過凌晨 4 點就重置每日 / 每週任務。

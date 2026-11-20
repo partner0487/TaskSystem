@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:task_system/models.dart';
+import 'package:task_system/notifications.dart';
 import 'package:task_system/store.dart';
 
 /// 假的存檔：像手機上的一樣存成 JSON 字串，每次讀取都產生全新的物件。
@@ -117,6 +118,43 @@ void main() {
       expect(trackedOf(), [false, false]);
       await store.toggleQuestTracked(store.quests.first);
       expect(trackedOf(), [true, true]);
+    });
+  });
+
+  group('通知欄的按鈕', () {
+    test('按「放棄」：細項變成已放棄並存檔（之前的 bug：放棄沒有被寫進去）', () async {
+      final id = store.quests.first.steps.first.id;
+      await store.handleNotificationAction(Notifier.actionAbandon, id);
+      expect(store.quests.first.steps.first.abandoned, isTrue);
+      expect(storage.saved.quests.first.steps.first.abandoned, isTrue);
+    });
+
+    test('按「完成」：細項變成已完成並存檔', () async {
+      final id = store.quests.first.steps.first.id;
+      await store.handleNotificationAction(Notifier.actionComplete, id);
+      expect(storage.saved.quests.first.steps.first.done, isTrue);
+    });
+
+    test('背景直接改資料時，「放棄」也會套用（App 沒開的情況）', () {
+      final data = storage.saved;
+      applyNotificationAction(data, abandonStepId: data.quests.first.steps.first.id);
+      expect(data.quests.first.steps.first.abandoned, isTrue);
+    });
+
+    test('回到前景重新讀取：沒有變動就不寫回存檔，不會蓋掉背景剛寫入的修改', () async {
+      var writes = 0;
+      final counting = QuestStore(
+        read: storage.read,
+        write: (d) async {
+          writes++;
+          await storage.write(d);
+        },
+        syncNotifications: (_) async {},
+      );
+      await counting.reload(); // 第一次讀：lastReset 是空的 → 會設定並寫入
+      writes = 0;
+      await counting.reload();
+      expect(writes, 0);
     });
   });
 

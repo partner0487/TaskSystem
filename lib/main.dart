@@ -17,7 +17,10 @@ Future<void> main() async {
   if (demoMode) await Storage.write(demoData());
 
   final store = QuestStore();
-  await Notifier.init(onDataChanged: store.reload);
+  await Notifier.init(
+    onDataChanged: store.reload,
+    onAction: store.handleNotificationAction,
+  );
 
   runApp(QuestApp(store: store));
 
