@@ -581,7 +581,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         color: GColors.overdue.withValues(alpha: 0.6),
         child: const Icon(Icons.delete_outline),
       ),
-      // 不用確認視窗：刪除後下方會出現「復原」
+      // 先問「確定要刪除嗎？」；按取消卡片會彈回原位。刪除後下方仍會出現「復原」
+      confirmDismiss: (_) => confirmDelete(context, s.title),
       onDismissed: (_) => _deleteStep(q, s),
       child: StepCard(
         step: s,
