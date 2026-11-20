@@ -108,6 +108,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   // ---------- 遊戲模式 ----------
 
+  static const _gameModeColor = Color(0xFFA48BE8);
+
   /// 目前的遊戲模式（null = 沒開；until == null = 直到手動關閉）
   ({DateTime? until})? _gameMode;
 
@@ -433,6 +435,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 style: TextStyle(
                     color: GColors.text, fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 4)),
           ),
+          // 遊戲模式：關閉中 = 灰色（按下選時間）；開啟中 = 紫色實心（按下立刻關閉）
+          if (!demoMode)
+            IconButton(
+              tooltip: _gameMode == null ? '遊戲模式' : '關閉遊戲模式',
+              onPressed: _gameMode == null ? _pickGameMode : _turnOffGameMode,
+              icon: Icon(
+                _gameMode == null ? Icons.sports_esports_outlined : Icons.sports_esports,
+                color: _gameMode == null ? GColors.sub : _gameModeColor,
+              ),
+            ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, color: GColors.sub),
             color: GColors.card,
@@ -440,12 +452,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               'export' => _export(),
               'import' => _import(),
               'battery' => SystemInfo.openAppSettings(),
-              'game' => _gameMode == null ? _pickGameMode() : _turnOffGameMode(),
               'restore' => _restoreAutoBackup(),
               'clear' => _clearCompleted(),
               _ => _showAbout(),
             },
-            itemBuilder: (_) => [
+            itemBuilder: (_) => const [
               PopupMenuItem(
                 value: 'export',
                 child: ListTile(leading: Icon(Icons.upload_file), title: Text('匯出備份')),
@@ -464,13 +475,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
               PopupMenuDivider(),
               PopupMenuItem(
-                value: 'game',
-                child: ListTile(
-                  leading: const Icon(Icons.sports_esports_outlined),
-                  title: Text(_gameMode == null ? '遊戲模式' : '關閉遊戲模式'),
-                ),
-              ),
-              const PopupMenuItem(
                 value: 'battery',
                 child: ListTile(leading: Icon(Icons.battery_charging_full), title: Text('背景執行設定')),
               ),
@@ -491,7 +495,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (g != null) {
       final until = g.until;
       return _Banner(
-        color: const Color(0xFFA48BE8),
+        color: _gameModeColor,
         icon: Icons.sports_esports_outlined,
         text: until == null
             ? '遊戲模式中・直到手動關閉\n任務通知和提醒已暫停'
