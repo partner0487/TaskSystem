@@ -268,7 +268,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   Future<void> _editStep(Quest q, QuestStep s) async {
-    final r = await showStepSheet(context, type: q.type, step: s);
+    final r = await showStepSheet(context,
+        type: q.type, step: s, onDelete: () => _deleteStep(q, s));
     if (r == null) return;
     final ok = await store.updateStep(s,
         title: r.title,

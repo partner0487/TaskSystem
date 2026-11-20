@@ -36,11 +36,21 @@ Widget _sheetTitle(String text) => Padding(
               color: GColors.gold, fontSize: 20, fontWeight: FontWeight.bold)),
     );
 
-Widget _buttons(BuildContext context, VoidCallback onOk) => Padding(
+/// 表單底部：左邊可以放紅字「刪除」（[onDelete]，只有編輯時才有），右邊「取消」「確定」。
+Widget _buttons(BuildContext context, VoidCallback onOk, {VoidCallback? onDelete}) => Padding(
       padding: const EdgeInsets.only(top: 20),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
+          if (onDelete != null) ...[
+            TextButton.icon(
+              onPressed: onDelete,
+              style: TextButton.styleFrom(foregroundColor: GColors.overdue),
+              icon: const Icon(Icons.delete_outline, size: 18),
+              label: const Text('刪除'),
+            ),
+            const Spacer(),
+          ],
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
           const SizedBox(width: 8),
           FilledButton(
@@ -127,15 +137,17 @@ class _QuestFormState extends State<_QuestForm> {
 }
 
 /// 新增 / 編輯細項。[type] 是所屬大事件的分類（每週任務才會顯示星期幾）。
+/// 編輯時傳入 [onDelete]，表單左下角會出現紅字「刪除」：關閉表單後呼叫它。
 Future<StepInput?> showStepSheet(BuildContext context,
-    {required QuestType type, QuestStep? step}) {
-  return _sheet<StepInput>(context, _StepForm(type: type, step: step));
+    {required QuestType type, QuestStep? step, VoidCallback? onDelete}) {
+  return _sheet<StepInput>(context, _StepForm(type: type, step: step, onDelete: onDelete));
 }
 
 class _StepForm extends StatefulWidget {
-  const _StepForm({required this.type, this.step});
+  const _StepForm({required this.type, this.step, this.onDelete});
   final QuestType type;
   final QuestStep? step;
+  final VoidCallback? onDelete;
 
   @override
   State<_StepForm> createState() => _StepFormState();
@@ -332,7 +344,17 @@ class _StepFormState extends State<_StepForm> {
             ],
           ),
         ],
-        _buttons(context, _submit),
+        _buttons(
+          context,
+          _submit,
+          // 編輯時才有「刪除」：先關掉表單，再刪除（下方會出現「復原」）
+          onDelete: widget.onDelete == null
+              ? null
+              : () {
+                  Navigator.pop(context);
+                  widget.onDelete!();
+                },
+        ),
       ],
     );
   }
