@@ -2,7 +2,9 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
+import 'auto_backup.dart';
 import 'backup.dart';
+import 'demo.dart';
 import 'models.dart';
 import 'notifications.dart';
 import 'storage.dart';
@@ -15,13 +17,17 @@ class QuestStore extends ChangeNotifier {
     Future<AppData> Function()? read,
     Future<void> Function(AppData)? write,
     Future<void> Function(AppData)? syncNotifications,
+    Future<void> Function(AppData)? dailyBackup,
   })  : _read = read ?? Storage.read,
         _write = write ?? Storage.write,
-        _sync = syncNotifications ?? Notifier.sync;
+        _sync = syncNotifications ?? Notifier.sync,
+        _dailyBackup = dailyBackup ??
+            (demoMode ? (_) async {} : (d) => AutoBackup.runDaily(d, DateTime.now()));
 
   final Future<AppData> Function() _read;
   final Future<void> Function(AppData) _write;
   final Future<void> Function(AppData) _sync;
+  final Future<void> Function(AppData) _dailyBackup;
 
   AppData _data = AppData(nextId: 1);
   bool loaded = false;
@@ -87,7 +93,14 @@ class QuestStore extends ChangeNotifier {
         notifyListeners();
         if (changed) await _write(_data);
         await _sync(_data);
+        // 每天第一次打開（或回到前景）時自動備份一次；失敗也不影響 App
+        try {
+          await _dailyBackup(_data);
+        } catch (_) {}
       });
+
+  /// 從自動備份還原（可以復原）。
+  Future<void> restoreAutoBackup(AppData data) => importBackup(data);
 
   /// App 開著時，通知欄的「完成」「放棄」「滑掉」由背景轉交到這裡，跟其它修改一起依序處理。
   Future<void> handleNotificationAction(String action, int stepId) => _serial(() async {

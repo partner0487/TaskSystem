@@ -55,7 +55,10 @@ android {
 
     buildTypes {
         release {
-            signingConfig = if (keystorePropertiesFile.exists()) {
+            // 設定環境變數 TASKSYSTEM_DEBUG_SIGN=1 時改用 debug 金鑰：
+            // 用來在自己的手機上測試 release 版（可以直接覆蓋開發版，資料不會不見）
+            val forceDebugSigning = System.getenv("TASKSYSTEM_DEBUG_SIGN") == "1"
+            signingConfig = if (keystorePropertiesFile.exists() && !forceDebugSigning) {
                 signingConfigs.getByName("release")
             } else {
                 signingConfigs.getByName("debug")

@@ -16,6 +16,15 @@
 - 每次更新都必須用**同一把金鑰**，否則使用者無法直接升級，只能刪掉重裝（資料會消失）
 - 請把 `.jks` 和 `key.properties` 備份到安全的地方（密碼管理器、加密的雲端硬碟）
 - 沒有 `key.properties` 時，release 會改用 debug 金鑰（只適合自己測試，不要拿去發佈）
+- 想在自己手機上測 release 版、又不想移除開發版（資料會不見）時，設定環境變數
+  `TASKSYSTEM_DEBUG_SIGN=1` 再編譯，就會用 debug 金鑰簽，可以直接覆蓋安裝：
+
+  ```powershell
+  $env:TASKSYSTEM_DEBUG_SIGN = "1"; flutter build apk --release --split-per-abi
+  ```
+
+  **正式發佈前一定要開新的終端機（或 `Remove-Item Env:TASKSYSTEM_DEBUG_SIGN`）**，
+  並用 `apksigner verify --print-certs` 確認簽章不是 `Android Debug`。
 
 ## 每次發佈的步驟
 

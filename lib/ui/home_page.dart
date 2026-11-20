@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import '../auto_backup.dart';
 import '../backup.dart';
 import '../demo.dart';
 import '../models.dart';
@@ -119,6 +120,33 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           _showUndo('已刪除「${q.title}」');
         }
     }
+  }
+
+  /// 還原每天自動做的那一份備份（今天第一次打開 App 時的樣子）。
+  Future<void> _restoreAutoBackup() async {
+    final backup = await AutoBackup.read();
+    if (!mounted) return;
+    if (backup == null) {
+      _toast('還沒有自動備份（每天第一次打開 App 時會自動備份）');
+      return;
+    }
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: GColors.header,
+        title: const Text('還原自動備份？'),
+        content: Text('備份時間：${formatDateTime(backup.savedAt, withWeekday: true)}\n'
+            '備份內容：${backupSummary(backup.data)}\n\n'
+            '目前所有任務會被這份備份取代。'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('還原')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await store.restoreAutoBackup(backup.data);
+    _showUndo('已還原自動備份');
   }
 
   /// 清除主線 / 支線裡已完成的細項（每日 / 每週會自己重置，不清）。
@@ -337,6 +365,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               'export' => _export(),
               'import' => _import(),
               'battery' => SystemInfo.openAppSettings(),
+              'restore' => _restoreAutoBackup(),
               'clear' => _clearCompleted(),
               _ => _showAbout(),
             },
@@ -348,6 +377,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               PopupMenuItem(
                 value: 'import',
                 child: ListTile(leading: Icon(Icons.download), title: Text('匯入備份')),
+              ),
+              PopupMenuItem(
+                value: 'restore',
+                child: ListTile(leading: Icon(Icons.restore), title: Text('還原自動備份')),
               ),
               PopupMenuItem(
                 value: 'clear',
