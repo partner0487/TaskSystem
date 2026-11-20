@@ -78,13 +78,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   /// 目前有沒有任務剩不到 1 小時（倒數會顯示秒數）。
-  bool _showsSeconds(DateTime now) => store.quests.any((q) => q.steps.any((s) {
-        if (s.closed) return false;
-        final d = countdownTarget(q.type, s, now);
-        if (d == null) return false;
-        final left = d.difference(now);
-        return left > const Duration(seconds: -1) && left < const Duration(hours: 1);
-      }));
+  bool _showsSeconds(DateTime now) => store.quests.any(
+    (q) => q.steps.any((s) {
+      if (s.closed) return false;
+      final d = countdownTarget(q.type, s, now);
+      if (d == null) return false;
+      final left = d.difference(now);
+      return left > const Duration(seconds: -1) &&
+          left < const Duration(hours: 1);
+    }),
+  );
 
   @override
   void dispose() {
@@ -135,15 +138,20 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         children: [
           const Padding(
             padding: EdgeInsets.fromLTRB(24, 0, 24, 8),
-            child: Text('暫時清空通知欄、停掉所有提醒。要開多久？',
-                style: TextStyle(color: GColors.sub, fontSize: 13)),
+            child: Text(
+              '暫時清空通知欄、停掉所有提醒。要開多久？',
+              style: TextStyle(color: GColors.sub, fontSize: 13),
+            ),
           ),
           for (final d in gameModeDurations)
             SimpleDialogOption(
               onPressed: () => Navigator.pop(ctx, (d: d)),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Text(gameModeDurationText(d), style: const TextStyle(fontSize: 16)),
+                child: Text(
+                  gameModeDurationText(d),
+                  style: const TextStyle(fontSize: 16),
+                ),
               ),
             ),
         ],
@@ -153,11 +161,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     await GameMode.turnOn(picked.d);
     await _afterGameModeChanged();
     final g = _gameMode;
-    _toast(g == null
-        ? '遊戲模式已開啟'
-        : g.until == null
-            ? '遊戲模式已開啟，直到手動關閉'
-            : '遊戲模式已開啟，到 ${timeText(g.until!.hour * 60 + g.until!.minute)} 自動關閉');
+    _toast(
+      g == null
+          ? '遊戲模式已開啟'
+          : g.until == null
+          ? '遊戲模式已開啟，直到手動關閉'
+          : '遊戲模式已開啟，到 ${timeText(g.until!.hour * 60 + g.until!.minute)} 自動關閉',
+    );
   }
 
   Future<void> _turnOffGameMode() async {
@@ -188,7 +198,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         await _addStep(q);
       case 'edit':
         final r = await showQuestSheet(context, quest: q, initialType: q.type);
-        if (r != null && !await store.updateQuest(q, title: r.title, type: r.type)) {
+        if (r != null &&
+            !await store.updateQuest(q, title: r.title, type: r.type)) {
           _toast('「${q.title}」已經不存在，可能被刪除了');
         }
       case 'delete':
@@ -212,12 +223,20 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       builder: (ctx) => AlertDialog(
         backgroundColor: GColors.header,
         title: const Text('還原自動備份？'),
-        content: Text('備份時間：${formatDateTime(backup.savedAt, withWeekday: true)}\n'
-            '備份內容：${backupSummary(backup.data)}\n\n'
-            '目前所有任務會被這份備份取代。'),
+        content: Text(
+          '備份時間：${formatDateTime(backup.savedAt, withWeekday: true)}\n'
+          '備份內容：${backupSummary(backup.data)}\n\n'
+          '目前所有任務會被這份備份取代。',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('還原')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('還原'),
+          ),
         ],
       ),
     );
@@ -245,9 +264,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     // 還沒輪到的每週任務不能打勾（例如週一的「週六日籃球」）
     if (!isActiveOn(q.type, s, _now)) {
       final next = nextResetFor(q.type, s, _now);
-      _toast(next == null
-          ? '「${s.title}」現在不能打勾'
-          : '「${s.title}」${nextResetLabel(next, _now)}才能打勾');
+      _toast(
+        next == null
+            ? '「${s.title}」現在不能打勾'
+            : '「${s.title}」${nextResetLabel(next, _now)}才能打勾',
+      );
       return;
     }
     // 用回傳值判斷（畫面上的 s 在重新讀取後可能是舊的物件）
@@ -275,9 +296,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Future<void> _toggleQuestTracked(Quest q) async {
     final tracked = await store.toggleQuestTracked(q);
     if (tracked == null) return;
-    _toast(tracked
-        ? '「${q.title}」已全部追蹤，會出現在通知欄'
-        : '「${q.title}」已全部取消追蹤，不會出現在通知欄，也不會提醒');
+    _toast(
+      tracked
+          ? '「${q.title}」已全部追蹤，會出現在通知欄'
+          : '「${q.title}」已全部取消追蹤，不會出現在通知欄，也不會提醒',
+    );
   }
 
   Future<void> _toggleStepTracked(QuestStep s) async {
@@ -291,19 +314,23 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 4),
-        action: SnackBarAction(label: '復原', onPressed: store.undo),
-      ));
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 4),
+          action: SnackBarAction(label: '復原', onPressed: store.undo),
+        ),
+      );
   }
 
   void _toast(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message), behavior: SnackBarBehavior.floating));
+      ..showSnackBar(
+        SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+      );
   }
 
   // ---------- 備份 ----------
@@ -340,8 +367,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           title: const Text('匯入備份？'),
           content: Text('備份內容：${backupSummary(data)}\n\n目前所有任務會被這份備份取代。'),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
-            TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('匯入')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('匯入'),
+            ),
           ],
         ),
       );
@@ -358,13 +391,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Future<void> _addStep(Quest q) async {
     final r = await showStepSheet(context, type: q.type);
     if (r == null) return;
-    final ok = await store.addStep(q,
-        title: r.title,
-        note: r.note,
-        deadline: r.deadline,
-        weekdays: r.weekdays,
-        remindBefore: r.remindBefore,
-        timeOfDay: r.timeOfDay);
+    final ok = await store.addStep(
+      q,
+      title: r.title,
+      note: r.note,
+      deadline: r.deadline,
+      weekdays: r.weekdays,
+      remindBefore: r.remindBefore,
+      timeOfDay: r.timeOfDay,
+    );
     if (!ok) {
       _toast('「${q.title}」已經不存在，可能被刪除了');
       return;
@@ -373,16 +408,22 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   Future<void> _editStep(Quest q, QuestStep s) async {
-    final r = await showStepSheet(context,
-        type: q.type, step: s, onDelete: () => _deleteStep(q, s));
+    final r = await showStepSheet(
+      context,
+      type: q.type,
+      step: s,
+      onDelete: () => _deleteStep(q, s),
+    );
     if (r == null) return;
-    final ok = await store.updateStep(s,
-        title: r.title,
-        note: r.note,
-        deadline: r.deadline,
-        weekdays: r.weekdays,
-        remindBefore: r.remindBefore,
-        timeOfDay: r.timeOfDay);
+    final ok = await store.updateStep(
+      s,
+      title: r.title,
+      note: r.note,
+      deadline: r.deadline,
+      weekdays: r.weekdays,
+      remindBefore: r.remindBefore,
+      timeOfDay: r.timeOfDay,
+    );
     if (!ok) _toast('「${s.title}」已經不存在，可能被刪除了');
   }
 
@@ -396,7 +437,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         floatingActionButton: FloatingActionButton(
           backgroundColor: GColors.cardSelected,
           foregroundColor: GColors.textDark,
-          shape: const CircleBorder(side: BorderSide(color: GColors.gold, width: 2)),
+          shape: const CircleBorder(
+            side: BorderSide(color: GColors.gold, width: 2),
+          ),
           onPressed: _addQuest,
           child: const Icon(Icons.add, size: 30),
         ),
@@ -431,20 +474,30 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           const DiamondIcon(size: 16, filled: true),
           const SizedBox(width: 10),
           const Expanded(
-            child: Text('任務系統',
-                style: TextStyle(
-                    color: GColors.text, fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 4)),
-          ),
-          // 遊戲模式：關閉中 = 灰色（按下選時間）；開啟中 = 紫色實心（按下立刻關閉）
-          if (!demoMode)
-            IconButton(
-              tooltip: _gameMode == null ? '遊戲模式' : '關閉遊戲模式',
-              onPressed: _gameMode == null ? _pickGameMode : _turnOffGameMode,
-              icon: Icon(
-                _gameMode == null ? Icons.sports_esports_outlined : Icons.sports_esports,
-                color: _gameMode == null ? GColors.sub : _gameModeColor,
+            child: Text(
+              '任務系統',
+              style: TextStyle(
+                color: GColors.text,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 4,
               ),
             ),
+          ),
+          // 遊戲模式：關閉中 = 灰色（按下選時間）；開啟中 = 紫色實心（按下立刻關閉）
+          // （展示模式只顯示、不動作：遊戲模式的設定跟真實資料共用）
+          IconButton(
+            tooltip: _gameMode == null ? '遊戲模式' : '關閉遊戲模式',
+            onPressed: demoMode
+                ? () {}
+                : (_gameMode == null ? _pickGameMode : _turnOffGameMode),
+            icon: Icon(
+              _gameMode == null
+                  ? Icons.sports_esports_outlined
+                  : Icons.sports_esports,
+              color: _gameMode == null ? GColors.sub : _gameModeColor,
+            ),
+          ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, color: GColors.sub),
             color: GColors.card,
@@ -459,28 +512,46 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             itemBuilder: (_) => const [
               PopupMenuItem(
                 value: 'export',
-                child: ListTile(leading: Icon(Icons.upload_file), title: Text('匯出備份')),
+                child: ListTile(
+                  leading: Icon(Icons.upload_file),
+                  title: Text('匯出備份'),
+                ),
               ),
               PopupMenuItem(
                 value: 'import',
-                child: ListTile(leading: Icon(Icons.download), title: Text('匯入備份')),
+                child: ListTile(
+                  leading: Icon(Icons.download),
+                  title: Text('匯入備份'),
+                ),
               ),
               PopupMenuItem(
                 value: 'restore',
-                child: ListTile(leading: Icon(Icons.restore), title: Text('還原自動備份')),
+                child: ListTile(
+                  leading: Icon(Icons.restore),
+                  title: Text('還原自動備份'),
+                ),
               ),
               PopupMenuItem(
                 value: 'clear',
-                child: ListTile(leading: Icon(Icons.cleaning_services_outlined), title: Text('清除已完成')),
+                child: ListTile(
+                  leading: Icon(Icons.cleaning_services_outlined),
+                  title: Text('清除已完成'),
+                ),
               ),
               PopupMenuDivider(),
               PopupMenuItem(
                 value: 'battery',
-                child: ListTile(leading: Icon(Icons.battery_charging_full), title: Text('背景執行設定')),
+                child: ListTile(
+                  leading: Icon(Icons.battery_charging_full),
+                  title: Text('背景執行設定'),
+                ),
               ),
               PopupMenuItem(
                 value: 'about',
-                child: ListTile(leading: Icon(Icons.info_outline), title: Text('關於')),
+                child: ListTile(
+                  leading: Icon(Icons.info_outline),
+                  title: Text('關於'),
+                ),
               ),
             ],
           ),
@@ -544,15 +615,23 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             Text('任務系統'),
           ],
         ),
-        content: Text('版本 $version\n\n把待辦事項變成任務清單，\n未完成的任務會常駐在通知欄。',
-            style: const TextStyle(color: GColors.text, height: 1.5)),
+        content: Text(
+          '版本 $version\n\n把待辦事項變成任務清單，\n未完成的任務會常駐在通知欄。',
+          style: const TextStyle(color: GColors.text, height: 1.5),
+        ),
         actions: [
           TextButton(
             onPressed: () => SystemInfo.openUrl('$repo/releases'),
             child: const Text('檢查更新'),
           ),
-          TextButton(onPressed: () => SystemInfo.openUrl(repo), child: const Text('GitHub')),
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('關閉')),
+          TextButton(
+            onPressed: () => SystemInfo.openUrl(repo),
+            child: const Text('GitHub'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('關閉'),
+          ),
         ],
       ),
     );
@@ -587,15 +666,22 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         isLabelVisible: store.openStepCount(t) > 0,
                         label: Text('${store.openStepCount(t)}'),
                         backgroundColor: GColors.accent,
-                        child: Icon(t.icon, color: _tab == t ? GColors.gold : GColors.sub),
+                        child: Icon(
+                          t.icon,
+                          color: _tab == t ? GColors.gold : GColors.sub,
+                        ),
                       ),
                       const SizedBox(height: 4),
-                      Text(t.label,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: _tab == t ? GColors.gold : GColors.sub,
-                            fontWeight: _tab == t ? FontWeight.bold : FontWeight.normal,
-                          )),
+                      Text(
+                        t.label,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: _tab == t ? GColors.gold : GColors.sub,
+                          fontWeight: _tab == t
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -615,9 +701,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           children: [
             const DiamondIcon(size: 28, color: GColors.sub),
             const SizedBox(height: 12),
-            Text('這裡還沒有${_tab.label}', style: const TextStyle(color: GColors.sub)),
+            Text(
+              '這裡還沒有${_tab.label}',
+              style: const TextStyle(color: GColors.sub),
+            ),
             const SizedBox(height: 4),
-            const Text('點右下角的 ＋ 新增', style: TextStyle(color: GColors.sub, fontSize: 12)),
+            const Text(
+              '點右下角的 ＋ 新增',
+              style: TextStyle(color: GColors.sub, fontSize: 12),
+            ),
           ],
         ),
       );
@@ -637,7 +729,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   /// 拖曳中的項目：浮起來加陰影。
-  Widget _dragProxy(Widget child, int index, Animation<double> animation) => Material(
+  Widget _dragProxy(Widget child, int index, Animation<double> animation) =>
+      Material(
         color: Colors.transparent,
         elevation: 8,
         shadowColor: Colors.black,
@@ -646,11 +739,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   Widget _buildQuest(Quest q, int index) {
     // 已完成的大事件預設收合
-    final expanded = q.done ? _collapsed.contains(-q.id) : !_collapsed.contains(q.id);
+    final expanded = q.done
+        ? _collapsed.contains(-q.id)
+        : !_collapsed.contains(q.id);
     void toggle() => setState(() {
-          final key = q.done ? -q.id : q.id;
-          _collapsed.contains(key) ? _collapsed.remove(key) : _collapsed.add(key);
-        });
+      final key = q.done ? -q.id : q.id;
+      _collapsed.contains(key) ? _collapsed.remove(key) : _collapsed.add(key);
+    });
 
     final steps = displaySteps(q.type, q.steps, _now);
 
@@ -688,12 +783,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         buildDefaultDragHandles: false,
                         proxyDecorator: _dragProxy,
                         itemCount: steps.length,
-                        onReorderItem: (from, to) => store.reorderSteps(q, steps, from, to),
-                        itemBuilder: (context, j) => ReorderableDelayedDragStartListener(
-                          key: ValueKey('step-${steps[j].id}'),
-                          index: j,
-                          child: _buildStep(q, steps[j]),
-                        ),
+                        onReorderItem: (from, to) =>
+                            store.reorderSteps(q, steps, from, to),
+                        itemBuilder: (context, j) =>
+                            ReorderableDelayedDragStartListener(
+                              key: ValueKey('step-${steps[j].id}'),
+                              index: j,
+                              child: _buildStep(q, steps[j]),
+                            ),
                       ),
                       AddStepButton(onTap: () => _addStep(q)),
                     ],
@@ -722,7 +819,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         type: q.type,
         now: _now,
         selected: _selectedStep == s.id,
-        onTap: () => setState(() => _selectedStep = _selectedStep == s.id ? null : s.id),
+        onTap: () =>
+            setState(() => _selectedStep = _selectedStep == s.id ? null : s.id),
         onEdit: () => _editStep(q, s),
         onToggle: () => _toggleStep(q, s),
         onToggleTrack: () => _toggleStepTracked(s),
@@ -766,7 +864,10 @@ class _Banner extends StatelessWidget {
           Icon(icon, color: color, size: 20),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(text, style: const TextStyle(color: GColors.text, fontSize: 13)),
+            child: Text(
+              text,
+              style: const TextStyle(color: GColors.text, fontSize: 13),
+            ),
           ),
           TextButton(
             onPressed: onAction,
