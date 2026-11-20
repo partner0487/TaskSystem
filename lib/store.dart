@@ -210,17 +210,16 @@ class QuestStore extends ChangeNotifier {
         return _commit();
       });
 
-  /// 清除主線 / 支線裡已完成的細項；整個做完的大事件一起刪掉（可以復原）。回傳清掉幾個細項。
+  /// 清除主線 / 支線裡已完成、已放棄的細項（可以復原）。回傳清掉幾個細項。
+  /// 大事件一律保留，就算底下清空了也留著，之後可以繼續新增細項。
   Future<int> clearCompleted() => _serial(() async {
         var count = 0;
         final targets = quests.where((q) => !q.type.recurring).toList();
         if (!targets.any((q) => q.steps.any((s) => s.closed))) return 0;
         _snapshot();
         for (final q in targets) {
-          final hadSteps = q.steps.isNotEmpty;
           count += q.steps.where((s) => s.closed).length;
           q.steps.removeWhere((s) => s.closed);
-          if (hadSteps && q.steps.isEmpty) quests.remove(q);
         }
         await _commit();
         return count;

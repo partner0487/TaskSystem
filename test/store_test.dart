@@ -158,6 +158,29 @@ void main() {
     });
   });
 
+  test('清除已完成：只清細項，大事件就算清空了也保留', () async {
+    storage.json = jsonEncode(AppData(nextId: 10, quests: [
+      Quest(id: 1, title: '全部做完的', type: QuestType.main, steps: [
+        QuestStep(id: 2, title: 'a', done: true),
+        QuestStep(id: 3, title: 'b', abandoned: true),
+      ]),
+      Quest(id: 4, title: '還有要做的', type: QuestType.side, steps: [
+        QuestStep(id: 5, title: 'c', done: true),
+        QuestStep(id: 6, title: 'd'),
+      ]),
+      Quest(id: 7, title: '每日', type: QuestType.daily, steps: [
+        QuestStep(id: 8, title: 'e', done: true), // 每日 / 每週會自己重置，不清
+      ]),
+    ]).toJson());
+    await store.reload();
+
+    expect(await store.clearCompleted(), 3);
+    expect(store.quests.map((q) => q.title), ['全部做完的', '還有要做的', '每日']);
+    expect(store.quests[0].steps, isEmpty);
+    expect(store.quests[1].steps.map((s) => s.title), ['d']);
+    expect(store.quests[2].steps.single.done, isTrue);
+  });
+
   group('放棄', () {
     final noon = DateTime(2026, 11, 20, 12);
 
