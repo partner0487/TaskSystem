@@ -263,13 +263,17 @@ class QuestStore extends ChangeNotifier {
 
   // ---------- 追蹤 ----------
 
-  /// 切換大事件的追蹤。回傳切換後的狀態（true = 追蹤中）；不存在時回傳 null。
+  /// 大事件的 📌：底下全部都在追蹤 → 全部取消追蹤；只要有一個沒追蹤 → 全部追蹤。
+  /// 回傳之後的狀態（true = 全部追蹤）；不存在時回傳 null。
   Future<bool?> toggleQuestTracked(Quest quest) => _serial(() async {
         final q = _quest(quest.id);
         if (q == null) return null;
-        q.tracked = !q.tracked;
+        final target = !q.allTracked;
+        for (final s in q.steps) {
+          s.tracked = target;
+        }
         await _commit();
-        return q.tracked;
+        return target;
       });
 
   /// 切換細項的追蹤。回傳切換後的狀態（true = 追蹤中）；不存在時回傳 null。

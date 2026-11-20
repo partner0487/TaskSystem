@@ -123,9 +123,9 @@ class Notifier {
 
     for (final q in data.quests) {
       for (final s in q.steps) {
-        // 取消追蹤（大事件或細項）：不放通知欄、不提醒、不預約；
+        // 取消追蹤：不放通知欄、不提醒、不預約；
         // 已經在通知欄的通知和提醒，會在下面「清掉不該存在的」時一起移除
-        if (!isTracked(q, s)) continue;
+        if (!s.tracked) continue;
 
         // 到期前的震動提醒（主線 / 支線 / 每週）
         if (!s.done) keepActive.add(_reminderIdOffset + s.id); // 已經跳出的提醒留著，等使用者自己處理

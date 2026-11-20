@@ -155,8 +155,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final tracked = await store.toggleQuestTracked(q);
     if (tracked == null) return;
     _toast(tracked
-        ? '已追蹤「${q.title}」，底下的任務會出現在通知欄'
-        : '已取消追蹤「${q.title}」，底下的任務不會出現在通知欄，也不會提醒');
+        ? '「${q.title}」已全部追蹤，會出現在通知欄'
+        : '「${q.title}」已全部取消追蹤，不會出現在通知欄，也不會提醒');
   }
 
   Future<void> _toggleStepTracked(QuestStep s) async {
@@ -574,7 +574,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         onTap: () => setState(() => _selectedStep = _selectedStep == s.id ? null : s.id),
         onEdit: () => _editStep(q, s),
         onToggle: () => _toggleStep(q, s),
-        questTracked: q.tracked,
         onToggleTrack: () => _toggleStepTracked(s),
       ),
     );

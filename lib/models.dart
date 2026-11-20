@@ -60,7 +60,7 @@ class QuestStep {
   /// 有指定時間的每日任務，時間到才出現在通知欄（例如「晚餐後吃藥 18:00」）。
   int? timeOfDay;
 
-  /// 追蹤中才會出現在通知欄、才會震動提醒（大事件也要是追蹤中）。
+  /// 追蹤中才會出現在通知欄、才會震動提醒。
   bool tracked;
 
   /// 每週任務實際的重置日。
@@ -107,7 +107,6 @@ class Quest {
     required this.title,
     required this.type,
     List<QuestStep>? steps,
-    this.tracked = true,
   }) : steps = steps ?? [];
 
   final int id;
@@ -115,8 +114,8 @@ class Quest {
   QuestType type;
   final List<QuestStep> steps;
 
-  /// 取消追蹤：底下所有細項都不出現在通知欄、不震動提醒。
-  bool tracked;
+  /// 底下的細項全部都在追蹤（大事件的 📌 顯示實心）。沒有細項時也算 true。
+  bool get allTracked => steps.every((s) => s.tracked);
 
   bool get done => steps.isNotEmpty && steps.every((s) => s.done);
   int get doneCount => steps.where((s) => s.done).length;
@@ -126,18 +125,26 @@ class Quest {
         'title': title,
         'type': type.name,
         'steps': steps.map((s) => s.toJson()).toList(),
-        'tracked': tracked,
       };
 
-  factory Quest.fromJson(Map<String, dynamic> j) => Quest(
+  factory Quest.fromJson(Map<String, dynamic> j) => Quest._migrate(j, Quest(
         id: j['id'] as int,
         title: j['title'] as String,
         type: QuestTypeInfo.parse(j['type'] as String),
         steps: (j['steps'] as List)
             .map((s) => QuestStep.fromJson(s as Map<String, dynamic>))
             .toList(),
-        tracked: (j['tracked'] as bool?) ?? true,
-      );
+      ));
+
+  /// 舊版曾經把「取消追蹤」記在大事件上；讀到時改成把底下每個細項都設成取消追蹤。
+  static Quest _migrate(Map<String, dynamic> j, Quest q) {
+    if (j['tracked'] == false) {
+      for (final s in q.steps) {
+        s.tracked = false;
+      }
+    }
+    return q;
+  }
 }
 
 /// 整個 App 存檔的內容。
@@ -327,12 +334,9 @@ DateTime? nextReminderTime(QuestType type, QuestStep s, DateTime now) {
   return at != null && at.isAfter(now) ? at : null;
 }
 
-/// 大事件和細項都在追蹤中，才會出現在通知欄、才會震動提醒。
-bool isTracked(Quest q, QuestStep s) => q.tracked && s.tracked;
-
 /// 現在要不要出現在通知欄。
 bool showsInNotificationBar(Quest q, QuestStep s, DateTime now) =>
-    isTracked(q, s) &&
+    s.tracked &&
     !s.done &&
     isActiveOn(q.type, s, now) &&
     !beforeDailyTime(q.type, s, now) &&
