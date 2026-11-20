@@ -73,6 +73,33 @@ void main() {
     expect(storage.saved.quests.first.steps.map((s) => s.title), contains('晚餐後吃藥'));
   });
 
+  test('追蹤：大事件或細項取消追蹤，就不會出現在通知欄', () async {
+    final q = store.quests.first;
+    final s = q.steps.first;
+    final now = DateTime(2026, 11, 20, 12);
+    expect(showsInNotificationBar(store.quests.first, store.quests.first.steps.first, now), isTrue);
+
+    expect(await store.toggleStepTracked(s), isFalse);
+    expect(showsInNotificationBar(store.quests.first, store.quests.first.steps.first, now), isFalse);
+    expect(await store.toggleStepTracked(s), isTrue);
+
+    expect(await store.toggleQuestTracked(q), isFalse);
+    expect(showsInNotificationBar(store.quests.first, store.quests.first.steps.first, now), isFalse);
+    expect(storage.saved.quests.first.tracked, isFalse); // 有存檔
+
+    expect(await store.toggleQuestTracked(q), isTrue);
+    expect(showsInNotificationBar(store.quests.first, store.quests.first.steps.first, now), isTrue);
+  });
+
+  test('舊存檔沒有追蹤欄位 = 追蹤中', () {
+    final q = Quest.fromJson({
+      'id': 1, 'title': '舊', 'type': 'main',
+      'steps': [{'id': 2, 'title': 's'}],
+    });
+    expect(q.tracked, isTrue);
+    expect(q.steps.first.tracked, isTrue);
+  });
+
   test('大事件已經被刪掉時，新增會回報失敗（畫面會跳出提示）', () async {
     final quest = store.quests.first;
     await store.deleteQuest(quest);

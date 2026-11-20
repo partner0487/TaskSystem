@@ -123,6 +123,10 @@ class Notifier {
 
     for (final q in data.quests) {
       for (final s in q.steps) {
+        // 取消追蹤（大事件或細項）：不放通知欄、不提醒、不預約；
+        // 已經在通知欄的通知和提醒，會在下面「清掉不該存在的」時一起移除
+        if (!isTracked(q, s)) continue;
+
         // 到期前的震動提醒（主線 / 支線 / 每週）
         if (!s.done) keepActive.add(_reminderIdOffset + s.id); // 已經跳出的提醒留著，等使用者自己處理
         final remindAt = nextReminderTime(q.type, s, now);
@@ -135,7 +139,7 @@ class Notifier {
         if (isStale(q.type, s, now)) continue;
 
         // 有時間的每日任務（例如「晚餐後吃藥 18:00」）時間到才出現；之前走下面的預約
-        if (!s.done && isActiveOn(q.type, s, now) && !beforeDailyTime(q.type, s, now)) {
+        if (showsInNotificationBar(q, s, now)) {
           keepActive.add(s.id);
           await plugin.show(
             id: s.id, // 用細項 id 當通知 id，才能精準取消

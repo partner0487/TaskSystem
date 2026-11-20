@@ -261,6 +261,26 @@ class QuestStore extends ChangeNotifier {
         await _commit();
       });
 
+  // ---------- 追蹤 ----------
+
+  /// 切換大事件的追蹤。回傳切換後的狀態（true = 追蹤中）；不存在時回傳 null。
+  Future<bool?> toggleQuestTracked(Quest quest) => _serial(() async {
+        final q = _quest(quest.id);
+        if (q == null) return null;
+        q.tracked = !q.tracked;
+        await _commit();
+        return q.tracked;
+      });
+
+  /// 切換細項的追蹤。回傳切換後的狀態（true = 追蹤中）；不存在時回傳 null。
+  Future<bool?> toggleStepTracked(QuestStep step) => _serial(() async {
+        final found = _step(step.id);
+        if (found == null) return null;
+        final s = found.$2..tracked = !found.$2.tracked;
+        await _commit();
+        return s.tracked;
+      });
+
   /// 回傳打勾之後的狀態（true = 已完成）；細項不存在時回傳 null。
   Future<bool?> toggleStep(QuestStep step) => _serial(() async {
         final found = _step(step.id);

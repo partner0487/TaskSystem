@@ -40,6 +40,7 @@ class QuestStep {
     List<int>? weekdays,
     this.remindBefore,
     this.timeOfDay,
+    this.tracked = true,
   }) : weekdays = weekdays ?? [];
 
   final int id;
@@ -58,6 +59,9 @@ class QuestStep {
   /// 每日任務「每天幾點」（從午夜起算的分鐘數，例如 18:00 = 1080），null = 沒有指定時間。
   /// 有指定時間的每日任務，時間到才出現在通知欄（例如「晚餐後吃藥 18:00」）。
   int? timeOfDay;
+
+  /// 追蹤中才會出現在通知欄、才會震動提醒（大事件也要是追蹤中）。
+  bool tracked;
 
   /// 每週任務實際的重置日。
   List<int> get resetWeekdays => weekdays.isEmpty ? const [DateTime.monday] : weekdays;
@@ -78,6 +82,7 @@ class QuestStep {
         'weekdays': weekdays,
         'remindBefore': remindBefore,
         'timeOfDay': timeOfDay,
+        'tracked': tracked,
       };
 
   factory QuestStep.fromJson(Map<String, dynamic> j) => QuestStep(
@@ -91,6 +96,7 @@ class QuestStep {
         weekdays: ((j['weekdays'] as List?) ?? const []).cast<int>().toList(),
         remindBefore: j['remindBefore'] as int?,
         timeOfDay: j['timeOfDay'] as int?,
+        tracked: (j['tracked'] as bool?) ?? true, // 舊存檔沒有這個欄位 = 追蹤中
       );
 }
 
@@ -101,12 +107,16 @@ class Quest {
     required this.title,
     required this.type,
     List<QuestStep>? steps,
+    this.tracked = true,
   }) : steps = steps ?? [];
 
   final int id;
   String title;
   QuestType type;
   final List<QuestStep> steps;
+
+  /// 取消追蹤：底下所有細項都不出現在通知欄、不震動提醒。
+  bool tracked;
 
   bool get done => steps.isNotEmpty && steps.every((s) => s.done);
   int get doneCount => steps.where((s) => s.done).length;
@@ -116,6 +126,7 @@ class Quest {
         'title': title,
         'type': type.name,
         'steps': steps.map((s) => s.toJson()).toList(),
+        'tracked': tracked,
       };
 
   factory Quest.fromJson(Map<String, dynamic> j) => Quest(
@@ -125,6 +136,7 @@ class Quest {
         steps: (j['steps'] as List)
             .map((s) => QuestStep.fromJson(s as Map<String, dynamic>))
             .toList(),
+        tracked: (j['tracked'] as bool?) ?? true,
       );
 }
 
@@ -314,6 +326,17 @@ DateTime? nextReminderTime(QuestType type, QuestStep s, DateTime now) {
   final at = remindFor(next);
   return at != null && at.isAfter(now) ? at : null;
 }
+
+/// 大事件和細項都在追蹤中，才會出現在通知欄、才會震動提醒。
+bool isTracked(Quest q, QuestStep s) => q.tracked && s.tracked;
+
+/// 現在要不要出現在通知欄。
+bool showsInNotificationBar(Quest q, QuestStep s, DateTime now) =>
+    isTracked(q, s) &&
+    !s.done &&
+    isActiveOn(q.type, s, now) &&
+    !beforeDailyTime(q.type, s, now) &&
+    !isStale(q.type, s, now);
 
 /// 主線 / 支線逾期多久後從通知欄移除（App 裡仍保留）。
 const overdueHideAfter = Duration(days: 7);

@@ -149,6 +149,22 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (await store.toggleStep(s) == true) _showUndo('已完成「${s.title}」');
   }
 
+  // ---------- 追蹤 ----------
+
+  Future<void> _toggleQuestTracked(Quest q) async {
+    final tracked = await store.toggleQuestTracked(q);
+    if (tracked == null) return;
+    _toast(tracked
+        ? '已追蹤「${q.title}」，底下的任務會出現在通知欄'
+        : '已取消追蹤「${q.title}」，底下的任務不會出現在通知欄，也不會提醒');
+  }
+
+  Future<void> _toggleStepTracked(QuestStep s) async {
+    final tracked = await store.toggleStepTracked(s);
+    if (tracked == null) return;
+    _toast(tracked ? '已追蹤「${s.title}」' : '已取消追蹤「${s.title}」，不會出現在通知欄，也不會提醒');
+  }
+
   /// 下方跳出「…・復原」的提示，幾秒後自動消失。
   void _showUndo(String message) {
     if (!mounted) return;
@@ -500,6 +516,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               expanded: expanded,
               onTap: toggle,
               onMenu: (a) => _questMenu(q, a),
+              onToggleTrack: () => _toggleQuestTracked(q),
             ),
           ),
         ),
@@ -557,6 +574,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         onTap: () => setState(() => _selectedStep = _selectedStep == s.id ? null : s.id),
         onEdit: () => _editStep(q, s),
         onToggle: () => _toggleStep(q, s),
+        questTracked: q.tracked,
+        onToggleTrack: () => _toggleStepTracked(s),
       ),
     );
   }

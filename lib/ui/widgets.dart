@@ -51,6 +51,7 @@ class QuestHeader extends StatelessWidget {
     required this.expanded,
     required this.onTap,
     required this.onMenu,
+    required this.onToggleTrack,
   });
 
   final Quest quest;
@@ -60,6 +61,9 @@ class QuestHeader extends StatelessWidget {
   final bool expanded;
   final VoidCallback onTap;
   final void Function(String action) onMenu;
+
+  /// 📌：切換整個大事件要不要出現在通知欄
+  final VoidCallback onToggleTrack;
 
   @override
   Widget build(BuildContext context) {
@@ -99,6 +103,17 @@ class QuestHeader extends StatelessWidget {
               progress,
               style: const TextStyle(color: GColors.sub, fontSize: 13),
             ),
+            // 實心金色 = 追蹤中（會出現在通知欄）；空心灰色 = 沒追蹤
+            IconButton(
+              tooltip: quest.tracked ? '取消追蹤' : '追蹤',
+              visualDensity: VisualDensity.compact,
+              onPressed: onToggleTrack,
+              icon: Icon(
+                quest.tracked ? Icons.push_pin : Icons.push_pin_outlined,
+                size: 20,
+                color: quest.tracked ? GColors.gold : GColors.sub.withValues(alpha: 0.6),
+              ),
+            ),
             PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert, color: GColors.sub),
               color: GColors.card,
@@ -127,6 +142,8 @@ class StepCard extends StatelessWidget {
     required this.onTap,
     required this.onEdit,
     required this.onToggle,
+    required this.questTracked,
+    required this.onToggleTrack,
   });
 
   final QuestStep step;
@@ -137,8 +154,28 @@ class StepCard extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onToggle;
 
+  /// 所屬大事件是不是追蹤中（大事件沒追蹤時，細項自己的追蹤按鈕沒有作用）
+  final bool questTracked;
+  final VoidCallback onToggleTrack;
+
+  /// 大事件和細項都追蹤中，才會出現在通知欄
+  bool get _tracked => questTracked && step.tracked;
+
   /// 今天不是它的日子（例如週一的「週六日籃球」）
   bool get _resting => !isActiveOn(type, step, now);
+
+  /// 選中卡片裡的小按鈕（[onPressed] 為 null = 停用）
+  Widget _cardButton(IconData icon, String label, VoidCallback? onPressed) => TextButton.icon(
+        onPressed: onPressed,
+        style: TextButton.styleFrom(
+          foregroundColor: GColors.textDark,
+          disabledForegroundColor: GColors.textDark.withValues(alpha: 0.4),
+          padding: EdgeInsets.zero,
+          visualDensity: VisualDensity.compact,
+        ),
+        icon: Icon(icon, size: 16),
+        label: Text(label),
+      );
 
   /// 有時間的每日任務，時間還沒到（變暗，但可以提早打勾）
   bool get _beforeTime => beforeDailyTime(type, step, now);
@@ -260,7 +297,11 @@ class StepCard extends StatelessWidget {
                                     style: TextStyle(color: subColor, fontSize: 13),
                                   ),
                                 ),
-                                if (!step.done && _hasReminder) ...[
+                                // 沒追蹤：🔕（不在通知欄、不提醒），取代震動圖示
+                                if (!step.done && !_tracked) ...[
+                                  const SizedBox(width: 6),
+                                  Icon(Icons.notifications_off_outlined, size: 14, color: subColor),
+                                ] else if (!step.done && _hasReminder) ...[
                                   const SizedBox(width: 6),
                                   Icon(Icons.vibration, size: 14, color: subColor),
                                 ],
@@ -273,20 +314,19 @@ class StepCard extends StatelessWidget {
                                 style: const TextStyle(color: GColors.textDark, fontSize: 14),
                               ),
                             ],
-                            // 選中時才出現的「編輯」（長按是拖曳排序）
+                            // 選中時才出現的「編輯」和「追蹤」（長按是拖曳排序）
                             if (selected)
-                              Align(
-                                alignment: Alignment.centerLeft,
-                                child: TextButton.icon(
-                                  onPressed: onEdit,
-                                  style: TextButton.styleFrom(
-                                    foregroundColor: GColors.textDark,
-                                    padding: EdgeInsets.zero,
-                                    visualDensity: VisualDensity.compact,
-                                  ),
-                                  icon: const Icon(Icons.edit_outlined, size: 16),
-                                  label: const Text('編輯'),
-                                ),
+                              Row(
+                                children: [
+                                  _cardButton(Icons.edit_outlined, '編輯', onEdit),
+                                  const SizedBox(width: 16),
+                                  if (!questTracked)
+                                    _cardButton(Icons.push_pin_outlined, '大事件未追蹤', null)
+                                  else if (step.tracked)
+                                    _cardButton(Icons.push_pin, '取消追蹤', onToggleTrack)
+                                  else
+                                    _cardButton(Icons.push_pin_outlined, '追蹤', onToggleTrack),
+                                ],
                               ),
                           ],
                         ),
