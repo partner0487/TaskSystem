@@ -347,10 +347,12 @@ class _StepFormState extends State<_StepForm> {
         _buttons(
           context,
           _submit,
-          // 編輯時才有「刪除」：先關掉表單，再刪除（下方會出現「復原」）
+          // 編輯時才有「刪除」：先確認 → 關掉表單 → 刪除（下方會出現「復原」）
           onDelete: widget.onDelete == null
               ? null
-              : () {
+              : () async {
+                  final ok = await confirmDelete(context, widget.step!.title);
+                  if (!ok || !context.mounted) return;
                   Navigator.pop(context);
                   widget.onDelete!();
                 },
@@ -365,8 +367,8 @@ Future<bool> confirmDelete(BuildContext context, String name) async {
     context: context,
     builder: (ctx) => AlertDialog(
       backgroundColor: GColors.header,
-      title: const Text('確定刪除？'),
-      content: Text('「$name」將被刪除，無法復原。'),
+      title: const Text('刪除任務'),
+      content: Text('確定要刪除「$name」嗎？'),
       actions: [
         TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
         TextButton(
