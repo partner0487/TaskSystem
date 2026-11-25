@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -38,11 +39,38 @@ class _TourOverlayState extends State<_TourOverlay> {
   late final List<TourStep> _steps;
   int _i = 0;
 
+  /// 定時重畫：目標在指引進行中移動（捲動、頂端提示條出現）時，框和箭頭跟著走
+  late final Timer _follow;
+
   @override
   void initState() {
     super.initState();
     // 找不到目標的步驟跳過（例如這個分頁沒有大事件）
     _steps = widget.steps.where((s) => s.target == null || _rectOf(s.target!) != null).toList();
+    _follow = Timer.periodic(const Duration(milliseconds: 100), (_) {
+      if (mounted) setState(() {});
+    });
+    _scrollToTarget();
+  }
+
+  @override
+  void dispose() {
+    _follow.cancel();
+    super.dispose();
+  }
+
+  /// 目標在可以捲動的列表裡、而且不在畫面上（例如列表已經往下捲過）→ 捲到看得到的位置
+  void _scrollToTarget() {
+    if (_steps.isEmpty) return;
+    final ctx = _steps[_i].target?.currentContext;
+    if (ctx == null) return;
+    Scrollable.ensureVisible(
+      ctx,
+      alignment: 0.2, // 放在列表偏上方，下面留位置給說明框
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+      alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
+    );
   }
 
   /// 目標在畫面上的位置（找不到 = null）。
@@ -57,11 +85,15 @@ class _TourOverlayState extends State<_TourOverlay> {
       Navigator.pop(context);
     } else {
       setState(() => _i++);
+      _scrollToTarget();
     }
   }
 
   void _prev() {
-    if (_i > 0) setState(() => _i--);
+    if (_i > 0) {
+      setState(() => _i--);
+      _scrollToTarget();
+    }
   }
 
   @override
