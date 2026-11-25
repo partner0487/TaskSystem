@@ -275,7 +275,7 @@ class QuestStore extends ChangeNotifier {
       _serial(() async {
         final found = _step(step.id);
         if (found == null) return false;
-        // 改了期限 → 新的期限到了還沒做，要再記一次「未完成」
+        // 改了期限 → 新的期限到了還沒做，要再記一次「錯過」
         if (found.$2.deadline != deadline) found.$2.overdueLogged = false;
         found.$2
           ..title = title

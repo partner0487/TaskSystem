@@ -4,7 +4,7 @@ import '../models.dart';
 import '../store.dart';
 import '../theme.dart';
 
-/// 完成紀錄：最近 90 天完成、放棄、未完成的任務，依日期分組。
+/// 完成紀錄：最近 90 天完成、放棄、錯過的任務，依日期分組。
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key, required this.store});
 
@@ -25,7 +25,7 @@ class _HistoryPageState extends State<HistoryPage> {
   static String _kindLabel(HistoryKind k) => switch (k) {
         HistoryKind.done => '完成',
         HistoryKind.abandoned => '放棄',
-        HistoryKind.missed => '未完成',
+        HistoryKind.missed => '錯過',
       };
 
   @override
@@ -161,7 +161,7 @@ class _HistoryPageState extends State<HistoryPage> {
     };
     String two(int n) => n.toString().padLeft(2, '0');
     final time = '${two(e.at.hour)}:${two(e.at.minute)}';
-    // 右邊的說明：完成 / 放棄的時間；未完成 = 截止時間或「每日結算」
+    // 右邊的說明：完成 / 放棄的時間；錯過 = 截止時間或「每日結算」
     final when = switch (e.kind) {
       HistoryKind.missed => e.type.recurring
           ? (e.type == QuestType.daily ? '每日結算' : '每週結算')

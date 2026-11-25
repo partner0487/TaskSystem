@@ -194,7 +194,7 @@ void main() {
     expect(storage.saved.history, hasLength(1)); // 有存檔
   });
 
-  test('改了截止時間，新的期限到了還沒做會再記一次未完成', () async {
+  test('改了截止時間，新的期限到了還沒做會再記一次錯過', () async {
     storage.json = jsonEncode(AppData(nextId: 10, quests: [
       Quest(id: 1, title: '專題', type: QuestType.main, steps: [QuestStep(id: 2, title: '報告')]),
     ]).toJson());

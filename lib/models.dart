@@ -54,7 +54,7 @@ class QuestStep {
   /// 放棄了（例如錯過的任務）。每日 / 每週任務只放棄這一次，下次重置時會重新出現。
   bool abandoned;
 
-  /// 主線 / 支線：這個期限的「未完成」已經記到完成紀錄了（改期限時會清掉）。
+  /// 主線 / 支線：這個期限的「錯過」已經記到完成紀錄了（改期限時會清掉）。
   bool overdueLogged;
 
   /// 已結束 = 完成或放棄：不放通知欄、不提醒、排到已完成那一區。
@@ -183,7 +183,7 @@ class HistoryEntry {
   final HistoryKind kind;
 
   /// 完成 / 放棄：按下的時間。
-  /// 未完成：主線 / 支線 = 截止時間；每日 / 每週 = 結算的那一天（記成當天 23:59）。
+  /// 錯過：主線 / 支線 = 截止時間；每日 / 每週 = 結算的那一天（記成當天 23:59）。
   final DateTime at;
 
   Map<String, dynamic> toJson() => {
@@ -248,7 +248,7 @@ class AppData {
       ..abandoned = abandoned;
   }
 
-  /// 主線 / 支線過了截止時間還沒完成 → 記一筆「未完成」（每個期限只記一次）。
+  /// 主線 / 支線過了截止時間還沒完成 → 記一筆「錯過」（每個期限只記一次）。
   bool _logOverdue(DateTime now) {
     var changed = false;
     for (final q in quests.where((q) => !q.type.recurring)) {
@@ -264,7 +264,7 @@ class AppData {
     return changed;
   }
 
-  /// 每日結算：從 [last]（上次結算的那一天）到 [today] 前一天，每日 / 每週任務沒做的記「未完成」。
+  /// 每日結算：從 [last]（上次結算的那一天）到 [today] 前一天，每日 / 每週任務沒做的記「錯過」。
   /// [last] 那一天看目前的狀態；中間完全沒打開 App 的日子，代表一定沒做。最多回推 90 天。
   void _logMissed(DateTime last, DateTime today) {
     var d = last;
@@ -307,7 +307,7 @@ class AppData {
   /// - 沒選星期幾的每週任務：經過週一才改回未完成（一週做一次）
   /// App 畫面、通知欄的背景處理、開機補發都會呼叫，所以放在資料層。
   bool applyResets(DateTime now) {
-    // 主線 / 支線逾期的「未完成」、過期紀錄的清理，每次都檢查
+    // 主線 / 支線逾期的「錯過」、過期紀錄的清理，每次都檢查
     var changed = _logOverdue(now);
     if (_pruneHistory(now)) changed = true;
 

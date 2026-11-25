@@ -32,7 +32,7 @@ void main() {
     });
   });
 
-  group('主線 / 支線：截止時間到了還沒完成 → 未完成', () {
+  group('主線 / 支線：截止時間到了還沒完成 → 錯過', () {
     AppData withReport({bool done = false}) => AppData(nextId: 10, lastReset: '2026-11-23', quests: [
           Quest(id: 1, title: '專題', type: QuestType.main, steps: [
             QuestStep(id: 2, title: '報告', deadline: DateTime(2026, 11, 23, 18), done: done),
@@ -52,13 +52,13 @@ void main() {
       expect(d.history, hasLength(1));
     });
 
-    test('截止前就完成了 → 不記未完成', () {
+    test('截止前就完成了 → 不記錯過', () {
       final d = withReport(done: true);
       d.applyResets(DateTime(2026, 11, 24, 9));
       expect(d.history, isEmpty);
     });
 
-    test('逾期後才完成 → 未完成和完成兩筆都留著', () {
+    test('逾期後才完成 → 錯過和完成兩筆都留著', () {
       final d = withReport();
       d.applyResets(DateTime(2026, 11, 23, 19));
       final q = d.quests.first;
@@ -66,7 +66,7 @@ void main() {
       expect(log(d), ['missed 報告 11/23', 'done 報告 11/23']);
     });
 
-    test('沒有截止時間的不會有未完成', () {
+    test('沒有截止時間的不會有錯過', () {
       final d = AppData(nextId: 10, lastReset: '2026-11-23', quests: [
         Quest(id: 1, title: '購物', type: QuestType.side, steps: [QuestStep(id: 2, title: '牛奶')]),
       ]);
@@ -75,7 +75,7 @@ void main() {
     });
   });
 
-  group('每日 / 每週：每日結算沒做 → 未完成', () {
+  group('每日 / 每週：每日結算沒做 → 錯過', () {
     AppData daily({required String lastReset, bool done = false}) =>
         AppData(nextId: 10, lastReset: lastReset, quests: [
           Quest(id: 1, title: '生病', type: QuestType.daily, steps: [
