@@ -100,6 +100,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     store.removeListener(_checkGameMode);
     store.removeListener(_maybeStartTour);
+    _listScroll.dispose();
     _ticker.cancel();
     super.dispose();
   }
@@ -120,6 +121,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   /// 指引進行中才把 key 掛到元件上（拖曳排序時元件會被複製，平常掛 GlobalKey 會衝突）
   bool _touring = false;
+
+  /// 指引進行時暫時放在主線最上面的範例大事件（不存檔、不進通知欄，指引結束就消失）。
+  /// 這樣不管使用者的任務是空的、沒有細項、或列表捲到下面，指引都指得到同樣的東西。
+  Quest? _tourExample;
+
+  /// 主列表的捲動位置（指引開始時跳回最上面）
+  final _listScroll = ScrollController();
   final _tourTabs = GlobalKey();
   final _tourQuest = GlobalKey();
   final _tourStep = GlobalKey();
@@ -146,7 +154,20 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       _tab = QuestType.main;
       _selectedStep = null;
       _collapsed.clear();
+      final now = DateTime.now();
+      _tourExample = Quest(id: -1, title: '範例：期末報告', type: QuestType.main, steps: [
+        QuestStep(
+          id: -2,
+          title: '完成簡報',
+          note: '這是指引用的範例，指引結束就會消失。',
+          deadline: now.add(const Duration(days: 2, hours: 5)),
+          remindBefore: 60,
+        ),
+        QuestStep(id: -3, title: '整理參考資料'),
+      ]);
     });
+    // 列表直接跳回最上面（不用捲動動畫）
+    if (_listScroll.hasClients) _listScroll.jumpTo(0);
     await Future<void>.delayed(const Duration(milliseconds: 400)); // 等畫面排好
     if (!mounted) return;
     await showTour(context, [
@@ -169,7 +190,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       const TourStep(null, '最後：拉下通知欄看看',
           '還沒做的任務都在通知欄。\n展開通知，可以直接按「✓ 完成」或「✕ 放棄」，\n不用打開 App。'),
     ]);
-    if (mounted) setState(() => _touring = false);
+    if (mounted) {
+      setState(() {
+        _touring = false;
+        _tourExample = null;
+      });
+    }
   }
 
   // ---------- 遊戲模式 ----------
@@ -776,7 +802,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   Widget _buildList() {
-    final quests = store.questsOf(_tab);
+    final example = _tab == QuestType.main ? _tourExample : null;
+    final quests = [?example, ...store.questsOf(_tab)];
     if (quests.isEmpty) {
       return Center(
         child: Column(
@@ -799,11 +826,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
     // 長按大事件標題可以拖曳排序
     return ReorderableListView.builder(
+      scrollController: _listScroll,
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 96),
       buildDefaultDragHandles: false,
       proxyDecorator: _dragProxy,
       itemCount: quests.length,
-      onReorderItem: (from, to) => store.reorderQuests(_tab, from, to),
+      // 指引中（有範例大事件）不排序；平常照常
+      onReorderItem: (from, to) {
+        if (example == null) store.reorderQuests(_tab, from, to);
+      },
       itemBuilder: (context, i) => KeyedSubtree(
         key: ValueKey('quest-${quests[i].id}'),
         child: _buildQuest(quests[i], i),

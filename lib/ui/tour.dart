@@ -66,10 +66,8 @@ class _TourOverlayState extends State<_TourOverlay> {
     if (ctx == null) return;
     Scrollable.ensureVisible(
       ctx,
-      alignment: 0.2, // 放在列表偏上方，下面留位置給說明框
-      duration: const Duration(milliseconds: 250),
-      curve: Curves.easeOut,
-      alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
+      // 只有目標在畫面外才捲，而且直接跳過去（捲動動畫配上框的跟隨會卡）
+      alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
     );
   }
 
