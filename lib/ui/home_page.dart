@@ -515,7 +515,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             itemBuilder: (_) => const [
               PopupMenuItem(
                 value: 'history',
-                child: ListTile(leading: Icon(Icons.history), title: Text('完成紀錄')),
+                // 打勾清單（跟「還原自動備份」的時鐘箭頭區分）
+                child: ListTile(leading: Icon(Icons.fact_check_outlined), title: Text('完成紀錄')),
               ),
               PopupMenuDivider(),
               PopupMenuItem(
