@@ -16,12 +16,16 @@ import '../system.dart';
 import '../theme.dart';
 import 'edit_sheets.dart';
 import 'history_page.dart';
+import 'tour.dart';
 import 'widgets.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key, required this.store});
+  const HomePage({super.key, required this.store, this.showTourOnStart = false});
 
   final QuestStore store;
+
+  /// 第一次安裝打開時：資料讀好之後顯示新手指引
+  final bool showTourOnStart;
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -65,6 +69,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _checkGameMode();
     store.addListener(_checkGameMode); // 背景改了遊戲模式（快速設定、時間到）→ App 重新讀取時更新提示
     WidgetsBinding.instance.addPostFrameCallback((_) => _handleLaunchAction());
+    if (widget.showTourOnStart) store.addListener(_maybeStartTour);
     // 倒數文字的更新：有任務剩不到 1 小時（顯示到秒）就每秒重畫，
     // 否則每分鐘重畫一次就夠了（比較省電）。換分鐘時順便檢查是否跨過每日重置時間。
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -94,6 +99,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     store.removeListener(_checkGameMode);
+    store.removeListener(_maybeStartTour);
     _ticker.cancel();
     super.dispose();
   }
@@ -108,6 +114,62 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       _checkGameMode();
       _handleLaunchAction();
     }
+  }
+
+  // ---------- 新手指引 ----------
+
+  /// 指引進行中才把 key 掛到元件上（拖曳排序時元件會被複製，平常掛 GlobalKey 會衝突）
+  bool _touring = false;
+  final _tourTabs = GlobalKey();
+  final _tourQuest = GlobalKey();
+  final _tourStep = GlobalKey();
+  final _tourCheck = GlobalKey();
+  final _tourPin = GlobalKey();
+  final _tourFab = GlobalKey();
+  final _tourGame = GlobalKey();
+  final _tourMenu = GlobalKey();
+
+  GlobalKey? _tk(GlobalKey k) => _touring ? k : null;
+
+  /// 第一次打開：等資料讀好（通知權限也問完了）再開始
+  void _maybeStartTour() {
+    if (!store.loaded) return;
+    store.removeListener(_maybeStartTour);
+    _startTour();
+  }
+
+  Future<void> _startTour() async {
+    if (_touring || !mounted) return;
+    // 從主線分頁開始，第一個大事件要展開、細項不要選中，畫面才對得上說明
+    setState(() {
+      _touring = true;
+      _tab = QuestType.main;
+      _selectedStep = null;
+      _collapsed.clear();
+    });
+    await Future<void>.delayed(const Duration(milliseconds: 400)); // 等畫面排好
+    if (!mounted) return;
+    await showTour(context, [
+      const TourStep(null, '歡迎使用任務系統',
+          '把待辦事項變成任務清單，\n還沒做的任務會常駐在通知欄。\n\n跟著幾個步驟認識一下吧！'),
+      TourStep(_tourTabs, '四種任務',
+          '主線、支線：重要的事和零碎的事，可以設期限。\n每週、每日：固定要做的事，會自動重新出現。'),
+      TourStep(_tourQuest, '大事件',
+          '一件事可以拆成好幾個細項。\n點標題展開或收合；長按可以拖曳排序。'),
+      TourStep(_tourStep, '細項',
+          '點一下可以看備註，還有編輯、追蹤、放棄的按鈕。\n往左滑可以刪除。'),
+      TourStep(_tourCheck, '完成',
+          '做完按這裡打勾，通知欄的那一則也會消失。\n按錯了，下方可以「復原」。'),
+      TourStep(_tourPin, '追蹤',
+          '取消追蹤的任務不會出現在通知欄，也不會提醒。\n標題上的圖釘可以一次切換整組。'),
+      TourStep(_tourFab, '新增', '按這裡新增大事件，再到底下加細項。'),
+      TourStep(_tourGame, '遊戲模式', '打遊戲、開會時按一下，\n暫時隱藏所有任務通知和提醒。'),
+      TourStep(_tourMenu, '更多功能',
+          '完成紀錄、備份、背景執行設定都在這裡。\n想再看一次新手指引，也在這裡。'),
+      const TourStep(null, '最後：拉下通知欄看看',
+          '還沒做的任務都在通知欄。\n展開通知，可以直接按「✓ 完成」或「✕ 放棄」，\n不用打開 App。'),
+    ]);
+    if (mounted) setState(() => _touring = false);
   }
 
   // ---------- 遊戲模式 ----------
@@ -436,6 +498,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       listenable: store,
       builder: (context, _) => Scaffold(
         floatingActionButton: FloatingActionButton(
+          key: _tk(_tourFab),
           backgroundColor: GColors.cardSelected,
           foregroundColor: GColors.textDark,
           shape: const CircleBorder(
@@ -488,6 +551,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           // 遊戲模式：關閉中 = 灰色（按下選時間）；開啟中 = 紫色實心（按下立刻關閉）
           // （展示模式只顯示、不動作：遊戲模式的設定跟真實資料共用）
           IconButton(
+            key: _tk(_tourGame),
             tooltip: _gameMode == null ? '遊戲模式' : '關閉遊戲模式',
             onPressed: demoMode
                 ? () {}
@@ -500,6 +564,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             ),
           ),
           PopupMenuButton<String>(
+            key: _tk(_tourMenu),
             icon: const Icon(Icons.more_vert, color: GColors.sub),
             color: GColors.card,
             onSelected: (v) => switch (v) {
@@ -509,6 +574,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               'import' => _import(),
               'battery' => SystemInfo.openAppSettings(),
               'restore' => _restoreAutoBackup(),
+              'tour' => _startTour(),
               'clear' => _clearCompleted(),
               _ => _showAbout(),
             },
@@ -553,6 +619,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 child: ListTile(
                   leading: Icon(Icons.battery_charging_full),
                   title: Text('背景執行設定'),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'tour',
+                child: ListTile(
+                  leading: Icon(Icons.tips_and_updates_outlined),
+                  title: Text('新手指引'),
                 ),
               ),
               PopupMenuItem(
@@ -648,6 +721,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   Widget _buildTabs() {
     return Container(
+      key: _tk(_tourTabs),
       margin: const EdgeInsets.fromLTRB(12, 4, 12, 8),
       decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: Colors.white12)),
@@ -765,6 +839,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           child: ReorderableDelayedDragStartListener(
             index: index,
             child: QuestHeader(
+              key: index == 0 ? _tk(_tourQuest) : null,
+              pinKey: index == 0 ? _tk(_tourPin) : null,
               quest: q,
               progress: questProgress(q.type, q, _now),
               expanded: expanded,
@@ -798,7 +874,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                             ReorderableDelayedDragStartListener(
                               key: ValueKey('step-${steps[j].id}'),
                               index: j,
-                              child: _buildStep(q, steps[j]),
+                              child: _buildStep(q, steps[j], first: index == 0 && j == 0),
                             ),
                       ),
                       AddStepButton(onTap: () => _addStep(q)),
@@ -810,7 +886,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildStep(Quest q, QuestStep s) {
+  /// [first]：第一個大事件的第一個細項（新手指引會指到它和它的 ✓）
+  Widget _buildStep(Quest q, QuestStep s, {bool first = false}) {
     return Dismissible(
       key: ValueKey(s.id),
       direction: DismissDirection.endToStart,
@@ -824,6 +901,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       confirmDismiss: (_) => confirmDelete(context, s.title),
       onDismissed: (_) => _deleteStep(q, s),
       child: StepCard(
+        key: first ? _tk(_tourStep) : null,
+        checkKey: first ? _tk(_tourCheck) : null,
         step: s,
         type: q.type,
         now: _now,

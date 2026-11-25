@@ -52,7 +52,11 @@ class QuestHeader extends StatelessWidget {
     required this.onTap,
     required this.onMenu,
     required this.onToggleTrack,
+    this.pinKey,
   });
+
+  /// 新手指引要指到 📌 時用的 key
+  final GlobalKey? pinKey;
 
   final Quest quest;
 
@@ -107,6 +111,7 @@ class QuestHeader extends StatelessWidget {
             // 空心灰色 = 有沒追蹤的（按下 → 全部追蹤）
             if (quest.steps.isNotEmpty)
               IconButton(
+                key: pinKey,
                 tooltip: quest.allTracked ? '全部取消追蹤' : '全部追蹤',
                 visualDensity: VisualDensity.compact,
                 onPressed: onToggleTrack,
@@ -146,7 +151,11 @@ class StepCard extends StatelessWidget {
     required this.onToggle,
     required this.onToggleTrack,
     required this.onAbandon,
+    this.checkKey,
   });
+
+  /// 新手指引要指到 ✓ 時用的 key
+  final GlobalKey? checkKey;
 
   final QuestStep step;
   final QuestType type;
@@ -346,6 +355,7 @@ class StepCard extends StatelessWidget {
                     ),
                     Center(
                       child: CheckButton(
+                        key: checkKey,
                         done: step.done,
                         abandoned: step.abandoned,
                         selected: selected,

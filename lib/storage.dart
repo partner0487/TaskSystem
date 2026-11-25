@@ -18,6 +18,9 @@ class Storage {
     return AppData.fromJson(jsonDecode(raw) as Map<String, dynamic>);
   }
 
+  /// 已經有存檔了嗎？（沒有 = 第一次安裝打開）
+  static Future<bool> exists() async => await _prefs.getString(_key) != null;
+
   static Future<void> write(AppData data) =>
       _prefs.setString(_key, jsonEncode(data.toJson()));
 

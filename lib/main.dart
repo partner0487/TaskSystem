@@ -16,13 +16,16 @@ Future<void> main() async {
   // 展示模式：每次啟動都重新產生展示資料（倒數時間永遠是新的）
   if (demoMode) await Storage.write(demoData());
 
+  // 還沒有存檔 = 第一次安裝打開 → 顯示新手指引
+  final firstLaunch = !demoMode && !await Storage.exists();
+
   final store = QuestStore();
   await Notifier.init(
     onDataChanged: store.reload,
     onAction: store.handleNotificationAction,
   );
 
-  runApp(QuestApp(store: store));
+  runApp(QuestApp(store: store, showTour: firstLaunch));
 
   // 畫面出來後再要通知權限，然後讀資料並同步通知欄
   await Notifier.requestPermission();
@@ -48,9 +51,12 @@ Future<void> syncNotificationsOnly() async {
 }
 
 class QuestApp extends StatelessWidget {
-  const QuestApp({super.key, required this.store});
+  const QuestApp({super.key, required this.store, this.showTour = false});
 
   final QuestStore store;
+
+  /// 第一次安裝打開：顯示新手指引
+  final bool showTour;
 
   static const _zhTW = Locale.fromSubtags(
       languageCode: 'zh', scriptCode: 'Hant', countryCode: 'TW');
@@ -69,7 +75,7 @@ class QuestApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      home: HomePage(store: store),
+      home: HomePage(store: store, showTourOnStart: showTour),
     );
   }
 }
