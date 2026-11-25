@@ -181,6 +181,37 @@ void main() {
     expect(store.quests[2].steps.single.done, isTrue);
   });
 
+  test('完成紀錄：打勾、通知欄放棄都會記；按「復原」紀錄也會跟著還原', () async {
+    final s = store.quests.first.steps.first;
+    await store.toggleStep(s);
+    expect(store.history.map((e) => e.kind), [HistoryKind.done]);
+
+    await store.undo();
+    expect(store.history, isEmpty);
+
+    await store.handleNotificationAction(Notifier.actionAbandon, s.id);
+    expect(store.history.map((e) => e.kind), [HistoryKind.abandoned]);
+    expect(storage.saved.history, hasLength(1)); // 有存檔
+  });
+
+  test('改了截止時間，新的期限到了還沒做會再記一次未完成', () async {
+    storage.json = jsonEncode(AppData(nextId: 10, quests: [
+      Quest(id: 1, title: '專題', type: QuestType.main, steps: [QuestStep(id: 2, title: '報告')]),
+    ]).toJson());
+    await store.reload();
+    final s = store.quests.first.steps.first;
+    final anHourAgo = DateTime.now().subtract(const Duration(hours: 1));
+    await store.updateStep(s, title: s.title, note: '', weekdays: const [], deadline: anHourAgo);
+    await store.reload();
+    expect(store.history.where((e) => e.kind == HistoryKind.missed), hasLength(1));
+    expect(store.quests.first.steps.first.overdueLogged, isTrue);
+
+    await store.updateStep(store.quests.first.steps.first,
+        title: s.title, note: '', weekdays: const [],
+        deadline: anHourAgo.add(const Duration(minutes: 30)));
+    expect(store.quests.first.steps.first.overdueLogged, isFalse);
+  });
+
   group('放棄', () {
     final noon = DateTime(2026, 11, 20, 12);
 

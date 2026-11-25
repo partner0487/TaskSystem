@@ -34,6 +34,9 @@ class QuestStore extends ChangeNotifier {
 
   List<Quest> get quests => _data.quests;
 
+  /// 完成紀錄（舊 → 新）。
+  List<HistoryEntry> get history => _data.history;
+
   /// 某個分類的大事件：未完成的排前面，已完成的沉到下面。
   List<Quest> questsOf(QuestType type) {
     final list = quests.where((q) => q.type == type).toList();
@@ -272,6 +275,8 @@ class QuestStore extends ChangeNotifier {
       _serial(() async {
         final found = _step(step.id);
         if (found == null) return false;
+        // 改了期限 → 新的期限到了還沒做，要再記一次「未完成」
+        if (found.$2.deadline != deadline) found.$2.overdueLogged = false;
         found.$2
           ..title = title
           ..note = note
@@ -320,15 +325,10 @@ class QuestStore extends ChangeNotifier {
         final found = _step(step.id);
         if (found == null) return null;
         _snapshot();
-        final s = found.$2;
-        if (s.abandoned) {
-          // 已放棄的按 ✓ → 改成完成
-          s
-            ..abandoned = false
-            ..done = true;
-        } else {
-          s.done = !s.done;
-        }
+        final (q, s) = found;
+        // 已放棄的按 ✓ → 改成完成；其它就是切換完成
+        final done = s.abandoned ? true : !s.done;
+        _data.setStepState(q, s, done: done, abandoned: false, now: DateTime.now());
         await _commit();
         return s.done;
       });
@@ -338,10 +338,8 @@ class QuestStore extends ChangeNotifier {
         final found = _step(step.id);
         if (found == null) return null;
         _snapshot();
-        final s = found.$2;
-        s
-          ..abandoned = !s.abandoned
-          ..done = false;
+        final (q, s) = found;
+        _data.setStepState(q, s, done: false, abandoned: !s.abandoned, now: DateTime.now());
         await _commit();
         return s.abandoned;
       });

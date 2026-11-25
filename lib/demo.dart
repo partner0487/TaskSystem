@@ -99,6 +99,23 @@ AppData demoData() {
       steps: [step('喝水 2000cc'), step('整理桌面'), step('背 20 個英文單字', done: true)],
     ),
   ]);
+  // 完成紀錄的展示資料（今天、昨天、前天）
+  HistoryEntry h(String t, String q, QuestType type, HistoryKind k, DateTime at) =>
+      HistoryEntry(stepId: 0, title: t, questTitle: q, type: type, kind: k, at: at);
+  final today = gameDay(now);
+  DateTime at(int daysAgo, int hour, [int minute = 0]) =>
+      DateTime(today.year, today.month, today.day - daysAgo, hour, minute);
+  d.history.addAll([
+    h('喝水 2000cc', '每日任務', QuestType.daily, HistoryKind.missed, at(2, 23, 59)),
+    h('交讀書心得', '期末專題', QuestType.main, HistoryKind.missed, at(2, 18)),
+    h('早餐後吃藥', '感冒吃藥', QuestType.daily, HistoryKind.done, at(1, 8, 20)),
+    h('搶限量球鞋', '購物清單', QuestType.side, HistoryKind.abandoned, at(1, 12, 3)),
+    h('午餐後吃藥', '感冒吃藥', QuestType.daily, HistoryKind.done, at(1, 12, 45)),
+    h('晚餐後吃藥', '感冒吃藥', QuestType.daily, HistoryKind.missed, at(1, 23, 59)),
+    h('整理參考資料', '期末專題', QuestType.main, HistoryKind.done, at(0, 9, 10)),
+    h('洗衣精', '購物清單', QuestType.side, HistoryKind.done, at(0, 10, 32)),
+    h('背 20 個英文單字', '每日任務', QuestType.daily, HistoryKind.done, at(0, 11, 5)),
+  ]);
   d.lastReset = resetDayKey(now); // 已經是今天，不要被重置掉展示用的「已完成」
   return d;
 }

@@ -40,15 +40,14 @@ Future<void> onBackgroundNotificationResponse(NotificationResponse r) async {
 
 /// 套用通知欄的「完成」或「放棄」到資料上（背景和 App 共用，避免兩份邏輯不一致）。
 void applyNotificationAction(AppData data, {int? completeStepId, int? abandonStepId}) {
-  for (final s in data.quests.expand((q) => q.steps)) {
-    if (s.id == completeStepId) {
-      s
-        ..done = true
-        ..abandoned = false;
-    } else if (s.id == abandonStepId) {
-      s
-        ..abandoned = true
-        ..done = false;
+  final now = DateTime.now();
+  for (final q in data.quests) {
+    for (final s in q.steps) {
+      if (s.id == completeStepId) {
+        data.setStepState(q, s, done: true, abandoned: false, now: now);
+      } else if (s.id == abandonStepId) {
+        data.setStepState(q, s, done: false, abandoned: true, now: now);
+      }
     }
   }
 }

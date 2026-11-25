@@ -42,6 +42,7 @@ class QuestStep {
     this.timeOfDay,
     this.tracked = true,
     this.abandoned = false,
+    this.overdueLogged = false,
   }) : weekdays = weekdays ?? [];
 
   final int id;
@@ -52,6 +53,9 @@ class QuestStep {
 
   /// 放棄了（例如錯過的任務）。每日 / 每週任務只放棄這一次，下次重置時會重新出現。
   bool abandoned;
+
+  /// 主線 / 支線：這個期限的「未完成」已經記到完成紀錄了（改期限時會清掉）。
+  bool overdueLogged;
 
   /// 已結束 = 完成或放棄：不放通知欄、不提醒、排到已完成那一區。
   bool get closed => done || abandoned;
@@ -91,6 +95,7 @@ class QuestStep {
         'timeOfDay': timeOfDay,
         'tracked': tracked,
         'abandoned': abandoned,
+        'overdueLogged': overdueLogged,
       };
 
   factory QuestStep.fromJson(Map<String, dynamic> j) => QuestStep(
@@ -106,6 +111,7 @@ class QuestStep {
         timeOfDay: j['timeOfDay'] as int?,
         tracked: (j['tracked'] as bool?) ?? true, // 舊存檔沒有這個欄位 = 追蹤中
         abandoned: (j['abandoned'] as bool?) ?? false,
+        overdueLogged: (j['overdueLogged'] as bool?) ?? false,
       );
 }
 
@@ -156,16 +162,144 @@ class Quest {
   }
 }
 
+/// 完成紀錄的種類。
+enum HistoryKind { done, abandoned, missed }
+
+/// 完成紀錄的一筆。細項之後被刪掉、改名，紀錄仍保留當時的名稱。
+class HistoryEntry {
+  HistoryEntry({
+    required this.stepId,
+    required this.title,
+    required this.questTitle,
+    required this.type,
+    required this.kind,
+    required this.at,
+  });
+
+  final int stepId;
+  final String title;
+  final String questTitle;
+  final QuestType type;
+  final HistoryKind kind;
+
+  /// 完成 / 放棄：按下的時間。
+  /// 未完成：主線 / 支線 = 截止時間；每日 / 每週 = 結算的那一天（記成當天 23:59）。
+  final DateTime at;
+
+  Map<String, dynamic> toJson() => {
+        'stepId': stepId,
+        'title': title,
+        'questTitle': questTitle,
+        'type': type.name,
+        'kind': kind.name,
+        'at': at.toIso8601String(),
+      };
+
+  factory HistoryEntry.fromJson(Map<String, dynamic> j) => HistoryEntry(
+        stepId: j['stepId'] as int,
+        title: j['title'] as String,
+        questTitle: (j['questTitle'] as String?) ?? '',
+        type: QuestTypeInfo.parse(j['type'] as String),
+        kind: HistoryKind.values.asNameMap()[j['kind']] ?? HistoryKind.done,
+        at: DateTime.parse(j['at'] as String),
+      );
+}
+
+/// 完成紀錄保留幾天。
+const historyKeepDays = 90;
+
 /// 整個 App 存檔的內容。
 class AppData {
-  AppData({required this.nextId, this.lastReset, List<Quest>? quests})
-      : quests = quests ?? [];
+  AppData({required this.nextId, this.lastReset, List<Quest>? quests, List<HistoryEntry>? history})
+      : quests = quests ?? [],
+        history = history ?? [];
 
   int nextId;
   String? lastReset; // 上次每日重置的日期（以凌晨 4 點為分界）
   final List<Quest> quests;
 
+  /// 完成紀錄（舊 → 新），只保留最近 [historyKeepDays] 天。
+  final List<HistoryEntry> history;
+
   int newId() => nextId++;
+
+  void _log(Quest q, QuestStep s, HistoryKind kind, DateTime at) => history.add(HistoryEntry(
+      stepId: s.id, title: s.title, questTitle: q.title, type: q.type, kind: kind, at: at));
+
+  /// 取消某個細項最近一筆這種紀錄（例如打勾後又取消打勾）。
+  void _unlog(int stepId, HistoryKind kind) {
+    for (var i = history.length - 1; i >= 0; i--) {
+      if (history[i].stepId == stepId && history[i].kind == kind) {
+        history.removeAt(i);
+        return;
+      }
+    }
+  }
+
+  /// 改變細項的完成 / 放棄狀態，並記到完成紀錄。所有改狀態的地方都要走這裡。
+  void setStepState(Quest q, QuestStep s,
+      {required bool done, required bool abandoned, required DateTime now}) {
+    if (done && !s.done) _log(q, s, HistoryKind.done, now);
+    if (abandoned && !s.abandoned) _log(q, s, HistoryKind.abandoned, now);
+    if (!done && s.done) _unlog(s.id, HistoryKind.done);
+    if (!abandoned && s.abandoned) _unlog(s.id, HistoryKind.abandoned);
+    s
+      ..done = done
+      ..abandoned = abandoned;
+  }
+
+  /// 主線 / 支線過了截止時間還沒完成 → 記一筆「未完成」（每個期限只記一次）。
+  bool _logOverdue(DateTime now) {
+    var changed = false;
+    for (final q in quests.where((q) => !q.type.recurring)) {
+      for (final s in q.steps) {
+        final d = s.deadline;
+        if (d != null && !s.closed && !s.overdueLogged && !now.isBefore(d)) {
+          _log(q, s, HistoryKind.missed, d);
+          s.overdueLogged = true;
+          changed = true;
+        }
+      }
+    }
+    return changed;
+  }
+
+  /// 每日結算：從 [last]（上次結算的那一天）到 [today] 前一天，每日 / 每週任務沒做的記「未完成」。
+  /// [last] 那一天看目前的狀態；中間完全沒打開 App 的日子，代表一定沒做。最多回推 90 天。
+  void _logMissed(DateTime last, DateTime today) {
+    var d = last;
+    for (var n = 0; d.isBefore(today) && n < historyKeepDays; n++) {
+      final at = DateTime(d.year, d.month, d.day, 23, 59);
+      for (final q in quests.where((q) => q.type.recurring)) {
+        for (final s in q.steps) {
+          final bool due;
+          final bool sameOccurrence; // 這一次的狀態是不是就是目前看到的
+          if (q.type == QuestType.daily) {
+            due = true;
+            sameOccurrence = d == last;
+          } else if (s.weekdays.isNotEmpty) {
+            due = s.weekdays.contains(d.weekday);
+            sameOccurrence = d == last;
+          } else {
+            // 沒選星期幾的每週任務：一週一次，週日結算
+            due = d.weekday == DateTime.sunday;
+            final firstSunday = DateTime(last.year, last.month, last.day + (7 - last.weekday) % 7);
+            sameOccurrence = d == firstSunday;
+          }
+          if (due && (!sameOccurrence || !s.closed)) _log(q, s, HistoryKind.missed, at);
+        }
+      }
+      d = DateTime(d.year, d.month, d.day + 1);
+    }
+  }
+
+  /// 刪掉超過 [historyKeepDays] 天的紀錄。
+  bool _pruneHistory(DateTime now) {
+    final cutoff = now.subtract(const Duration(days: historyKeepDays));
+    final before = history.length;
+    history.removeWhere((e) => e.at.isBefore(cutoff));
+    return history.length != before;
+  }
 
   /// 跨過凌晨 4 點時重置。有變動時回傳 true。
   /// - 每日任務、有選星期幾的每週任務：每天都改回未完成
@@ -173,12 +307,17 @@ class AppData {
   /// - 沒選星期幾的每週任務：經過週一才改回未完成（一週做一次）
   /// App 畫面、通知欄的背景處理、開機補發都會呼叫，所以放在資料層。
   bool applyResets(DateTime now) {
+    // 主線 / 支線逾期的「未完成」、過期紀錄的清理，每次都檢查
+    var changed = _logOverdue(now);
+    if (_pruneHistory(now)) changed = true;
+
     final today = gameDay(now);
     final key = dayKey(today);
-    if (lastReset == key) return false;
+    if (lastReset == key) return changed;
 
     final last = parseDayKey(lastReset);
     if (last != null) {
+      _logMissed(last, today); // 先結算（記沒做的），再重置
       // 上次重置之後（不含）到今天（含）經過了哪些星期幾。超過 7 天就是全部。
       final passed = <int>{};
       for (var i = 0; i < 7; i++) {
@@ -207,6 +346,7 @@ class AppData {
         'nextId': nextId,
         'lastReset': lastReset,
         'quests': quests.map((q) => q.toJson()).toList(),
+        'history': history.map((e) => e.toJson()).toList(),
       };
 
   factory AppData.fromJson(Map<String, dynamic> j) => AppData(
@@ -214,6 +354,9 @@ class AppData {
         lastReset: j['lastReset'] as String?,
         quests: (j['quests'] as List)
             .map((q) => Quest.fromJson(q as Map<String, dynamic>))
+            .toList(),
+        history: ((j['history'] as List?) ?? const [])
+            .map((e) => HistoryEntry.fromJson(e as Map<String, dynamic>))
             .toList(),
       );
 

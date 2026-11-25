@@ -15,6 +15,7 @@ import '../store.dart';
 import '../system.dart';
 import '../theme.dart';
 import 'edit_sheets.dart';
+import 'history_page.dart';
 import 'widgets.dart';
 
 class HomePage extends StatefulWidget {
@@ -502,6 +503,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             icon: const Icon(Icons.more_vert, color: GColors.sub),
             color: GColors.card,
             onSelected: (v) => switch (v) {
+              'history' => Navigator.push(
+                  context, MaterialPageRoute(builder: (_) => HistoryPage(store: store))),
               'export' => _export(),
               'import' => _import(),
               'battery' => SystemInfo.openAppSettings(),
@@ -510,6 +513,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               _ => _showAbout(),
             },
             itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: 'history',
+                child: ListTile(leading: Icon(Icons.history), title: Text('完成紀錄')),
+              ),
+              PopupMenuDivider(),
               PopupMenuItem(
                 value: 'export',
                 child: ListTile(
