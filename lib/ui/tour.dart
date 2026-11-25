@@ -127,14 +127,18 @@ class _TourOverlayState extends State<_TourOverlay> {
           Positioned(
             bottom: padding.bottom + 20,
             left: 16,
-            child: OutlinedButton(
+            child: OutlinedButton.icon(
               onPressed: () => Navigator.pop(context),
               style: OutlinedButton.styleFrom(
                 foregroundColor: GColors.text,
                 backgroundColor: GColors.header,
-                side: const BorderSide(color: Colors.white24),
+                side: const BorderSide(color: Colors.white38, width: 1.5),
+                padding: const EdgeInsets.fromLTRB(22, 14, 16, 14),
+                textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
               ),
-              child: const Text('略過指引'),
+              iconAlignment: IconAlignment.end, // » 放在文字後面
+              icon: const Icon(Icons.keyboard_double_arrow_right, size: 24),
+              label: const Text('略過指引'),
             ),
           ),
         ],
