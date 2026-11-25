@@ -123,14 +123,18 @@ class _TourOverlayState extends State<_TourOverlay> {
                 right: 20,
                 bottom: size.height - boxAnchorY!,
                 child: IgnorePointer(child: box)),
-          // 略過（放左上角：右上角是 🎮 和 ⋮，會被擋到）
+          // 略過：放左下角（右上角是 🎮 和 ⋮、左上角是標題，都會被擋到；右下角是 ＋）
           Positioned(
-            top: padding.top + 8,
-            left: 12,
-            child: TextButton(
+            bottom: padding.bottom + 20,
+            left: 16,
+            child: OutlinedButton(
               onPressed: () => Navigator.pop(context),
-              style: TextButton.styleFrom(foregroundColor: GColors.sub),
-              child: const Text('略過'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: GColors.text,
+                backgroundColor: GColors.header,
+                side: const BorderSide(color: Colors.white24),
+              ),
+              child: const Text('略過指引'),
             ),
           ),
         ],
